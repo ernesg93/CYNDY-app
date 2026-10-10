@@ -1,0 +1,50 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Undetected; the repository contains no application source or stack manifest.
+  Architecture: Undetected; establish it through an approved change.
+  Testing: No test runner or test configuration is available.
+  Delivery: Stacked-to-main; keep reviewable work units at or below 400 changed lines.
+  Baseline: Empty published repository; do not infer application conventions from it.
+
+strict_tdd: false
+
+testing:
+  detected: 2026-10-10
+  runner:
+    available: false
+    command: ""
+    framework: ""
+  layers:
+    unit: false
+    integration: false
+    e2e: false
+  coverage:
+    available: false
+    command: ""
+  quality:
+    linter: ""
+    type_checker: ""
+    formatter: ""
+
+rules:
+  proposal:
+    - Include scope boundaries and rollback plan for risky changes.
+  specs:
+    - Use Given/When/Then scenarios and RFC 2119 keywords.
+  design:
+    - Document architectural decisions and rationale before implementation.
+  tasks:
+    - Group tasks by phase and keep each work unit reviewable at or below 400 changed lines.
+  apply:
+    guidelines:
+      - Do not create infrastructure or external resources unless explicitly approved.
+      - Establish the stack, quality tooling, and test strategy in an approved bootstrap change.
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.

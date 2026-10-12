@@ -24,6 +24,10 @@ export function calculateCountSnapshots(
   configurations: readonly CurrencyConfiguration[],
   quantities: CountQuantities,
 ): readonly CurrencyCountSnapshot[] {
+  if (configurations.length === 0) {
+    throw new TypeError("At least one currency configuration is required");
+  }
+
   return configurations.map((configuration) => {
     const issues = validateCurrencyConfiguration(configuration);
     if (issues.length > 0) {

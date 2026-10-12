@@ -46,4 +46,16 @@ describe("validateCurrencyConfiguration", () => {
       });
     },
   );
+
+  it("rejects duplicate denominations", () => {
+    const issues = validateCurrencyConfiguration({
+      ...validConfiguration,
+      denominations: [100, 100],
+    });
+
+    expect(issues).toContainEqual({
+      field: "denominations",
+      message: "denominations must be unique",
+    });
+  });
 });

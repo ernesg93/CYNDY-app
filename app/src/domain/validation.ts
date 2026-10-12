@@ -41,6 +41,11 @@ export function validateCurrencyConfiguration(
       field: "denominations",
       message: "denominations must be positive integers",
     });
+  } else if (new Set(configuration.denominations).size !== configuration.denominations.length) {
+    issues.push({
+      field: "denominations",
+      message: "denominations must be unique",
+    });
   }
 
   return issues;

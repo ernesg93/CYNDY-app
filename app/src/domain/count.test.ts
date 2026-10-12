@@ -46,4 +46,10 @@ describe("calculateCountSnapshots", () => {
       calculateCountSnapshots([{ ...currencies[0], code: "" }], {}),
     ).toThrow("Invalid currency configuration: code is required");
   });
+
+  it("rejects an empty currency configuration", () => {
+    expect(() => calculateCountSnapshots([], {})).toThrow(
+      "At least one currency configuration is required",
+    );
+  });
 });

@@ -1,22 +1,22 @@
 schema: spec-driven
 
 context: |
-  Tech stack: Undetected; the repository contains no application source or stack manifest.
-  Architecture: Undetected; establish it through an approved change.
-  Testing: No test runner or test configuration is available.
+  Tech stack: React 19, TypeScript 7, Vite 8, and Vitest 5 under app/.
+  Architecture: Static React application with pure domain modules; IndexedDB persistence follows in the next work unit.
+  Testing: Vitest unit tests and TypeScript type checking are available; integration and E2E layers are not established yet.
   Delivery: Stacked-to-main; keep reviewable work units at or below 400 changed lines.
   Baseline: Empty published repository; do not infer application conventions from it.
 
 strict_tdd: false
 
 testing:
-  detected: 2026-10-10
+  detected: 2026-10-12
   runner:
-    available: false
-    command: ""
-    framework: ""
+    available: true
+    command: "cd app && npm test -- --run"
+    framework: "Vitest 5"
   layers:
-    unit: false
+    unit: true
     integration: false
     e2e: false
   coverage:
@@ -24,7 +24,7 @@ testing:
     command: ""
   quality:
     linter: ""
-    type_checker: ""
+    type_checker: "cd app && npm run typecheck"
     formatter: ""
 
 rules:
@@ -41,10 +41,10 @@ rules:
       - Do not create infrastructure or external resources unless explicitly approved.
       - Establish the stack, quality tooling, and test strategy in an approved bootstrap change.
     tdd: false
-    test_command: ""
+    test_command: "cd app && npm test -- --run"
   verify:
-    test_command: ""
-    build_command: ""
+    test_command: "cd app && npm test -- --run"
+    build_command: "cd app && npm run build"
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas.

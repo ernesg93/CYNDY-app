@@ -28,15 +28,15 @@ Chain strategy: stacked-to-main
 
 ## Phase 1: Repository Bootstrap and Security
 
-- [ ] 1.1 Create the public GitHub repository with `LICENSE` (GPLv3), `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.gitignore`, and `.env.example`; document that secrets and real data are prohibited.
+- [x] 1.1 Create the public GitHub repository with `LICENSE` (GPLv3), `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.gitignore`, and `.env.example`; document that secrets and real data are prohibited.
 - [x] 1.2 Add `.github/dependabot.yml`; record the pre-release settings plan for secret scanning/push protection, Dependabot, code scanning, protected `main`, reviews, and required checks.
-- [ ] 1.3 Add `.github/workflows/codeql.yml` with the first JavaScript/TypeScript source PR, when source exists for CodeQL to analyze.
+- [x] 1.3 Add `.github/workflows/codeql.yml` with the first JavaScript/TypeScript source PR, when source exists for CodeQL to analyze.
 
 ## Phase 2: Static Foundation
 
-- [ ] 2.1 Create `app/package.json`, `app/vite.config.ts`, test setup, and static `app/dist` build scripts; prove no environment variables or server runtime are required.
-- [ ] 2.2 RED: add `app/src/domain/*.test.ts` for integer subtotals, no cross-currency aggregate, empty configuration, and invalid identity/denominations.
-- [ ] 2.3 GREEN: implement `app/src/domain/count.ts` and `validation.ts`; make the RED tests pass.
+- [x] 2.1 Create `app/package.json`, `app/vite.config.ts`, test setup, and static `app/dist` build scripts; prove no environment variables or server runtime are required.
+- [x] 2.2 RED: add `app/src/domain/*.test.ts` for integer subtotals, no cross-currency aggregate, empty configuration, and invalid identity/denominations.
+- [x] 2.3 GREEN: implement `app/src/domain/count.ts` and `validation.ts`; make the RED tests pass.
 - [ ] 2.4 RED/GREEN: implement and test `app/src/storage/indexed-db-repository.ts` for valid saves, immutable snapshots, note-only updates, deletion, and atomic reset.
 
 ## Phase 3: Accessible Local Counting

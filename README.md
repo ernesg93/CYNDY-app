@@ -4,7 +4,7 @@ CYNDY is a clean-room, Android-first money counter designed to work offline afte
 
 ## Project status
 
-Repository governance is established. Application source code is intentionally not part of this bootstrap work unit.
+Repository governance and the static React/TypeScript foundation are established. Domain tests cover configuration validation and independent per-currency totals; local persistence and interactive counting follow in later work units.
 
 ## Product boundaries
 
@@ -13,9 +13,19 @@ Repository governance is established. Application source code is intentionally n
 - Real user data, production exports, credentials, and secrets are prohibited from the repository.
 - Test fixtures must be synthetic.
 
-## Planned local development
+## Local development
 
-The application will live in `app/`. Commands will be documented when the static React/TypeScript foundation is added in the next work unit.
+The application lives in `app/` and supports Node.js 22.12 LTS, 24, and later even-numbered releases.
+
+```sh
+cd app
+npm ci
+npm test -- --run src/domain
+npm run build
+npm run dev
+```
+
+The build requires no environment variables or server runtime. Vite writes the portable static artifact to `app/dist`.
 
 ## Planned deployment
 

@@ -16,11 +16,11 @@ The system MUST be installable on supported Android browsers and open its shell 
 - WHEN the device has no network connection
 - THEN the user can open the app and reach locally available features
 
-#### Scenario: First use without a connection
+#### Scenario: Offline access before the initial visit
 
-- GIVEN the app has not completed a successful online load
-- WHEN the user opens it while offline
-- THEN the system explains that initial setup requires a connection without losing existing local data
+- GIVEN the app has never completed a successful online load
+- WHEN the user first visits while offline
+- THEN the application does not guarantee that its shell or messaging is available
 
 ### Requirement: Mobile Accessible Navigation
 

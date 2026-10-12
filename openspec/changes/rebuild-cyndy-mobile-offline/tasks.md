@@ -29,7 +29,8 @@ Chain strategy: stacked-to-main
 ## Phase 1: Repository Bootstrap and Security
 
 - [ ] 1.1 Create the public GitHub repository with `LICENSE` (GPLv3), `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.gitignore`, and `.env.example`; document that secrets and real data are prohibited.
-- [x] 1.2 Add `.github/dependabot.yml` and `.github/workflows/codeql.yml`; record the pre-release settings plan for secret scanning/push protection, Dependabot, code scanning, protected `main`, reviews, and required checks.
+- [x] 1.2 Add `.github/dependabot.yml`; record the pre-release settings plan for secret scanning/push protection, Dependabot, code scanning, protected `main`, reviews, and required checks.
+- [ ] 1.3 Add `.github/workflows/codeql.yml` with the first JavaScript/TypeScript source PR, when source exists for CodeQL to analyze.
 
 ## Phase 2: Static Foundation
 

@@ -1,0 +1,43 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+*.key
+*.pem
+*.p12
+*.pfx
+*credentials*.json
+*secrets*.json
+
+# Dependencies, builds, and test output
+node_modules/
+dist/
+app/dist/
+coverage/
+.vite/
+playwright-report/
+test-results/
+
+# Local tooling and editors
+.atl/
+.codegraph/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Private clean-room reference material; never publish these artifacts
+/lovable-source-export/
+/lovable-*.json
+/chat-export-*.json
+/chat-*.txt
+/*.[Pp][Nn][Gg]
+/*.[Jj][Pp][Gg]
+/*.[Jj][Pp][Ee][Gg]
+.opencode/

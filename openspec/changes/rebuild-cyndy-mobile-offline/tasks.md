@@ -37,7 +37,7 @@ Chain strategy: stacked-to-main
 - [x] 2.1 Create `app/package.json`, `app/vite.config.ts`, test setup, and static `app/dist` build scripts; prove no environment variables or server runtime are required.
 - [x] 2.2 RED: add `app/src/domain/*.test.ts` for integer subtotals, no cross-currency aggregate, empty configuration, and invalid identity/denominations.
 - [x] 2.3 GREEN: implement `app/src/domain/count.ts` and `validation.ts`; make the RED tests pass.
-- [ ] 2.4 RED/GREEN: implement and test `app/src/storage/indexed-db-repository.ts` for valid saves, immutable snapshots, note-only updates, deletion, and atomic reset.
+- [x] 2.4 RED/GREEN: implement and test `app/src/storage/indexed-db-repository.ts` for valid saves, immutable snapshots, note-only updates, deletion, and atomic reset.
 
 ## Phase 3: Accessible Local Counting
 

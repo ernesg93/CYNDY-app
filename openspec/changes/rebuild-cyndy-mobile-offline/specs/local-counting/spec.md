@@ -8,7 +8,7 @@ Configure local currencies and denominations, then save independent cash counts.
 
 ### Requirement: Valid Editable Configuration
 
-The system MUST persist local currency settings with editable name, symbol, and code. Denominations MUST be positive integers. It MUST reject missing currency identity or an empty denomination set and identify invalid fields in text.
+The system MUST persist local currency settings with editable name, symbol, and code. Denominations MUST be positive integers. It MUST reject missing currency identity or an empty denomination set and identify invalid fields in text. Count navigation MUST remain blocked until every configured currency is valid.
 
 #### Scenario: Save a valid denomination set
 
@@ -21,6 +21,12 @@ The system MUST persist local currency settings with editable name, symbol, and 
 - GIVEN the user enters zero, a negative value, or a non-integer denomination
 - WHEN the user attempts to save
 - THEN configuration is not saved and the invalid input is identified
+
+#### Scenario: Block counting when any configured currency is invalid
+
+- GIVEN one configured currency is valid and another is invalid
+- WHEN the user opens the dashboard or a direct count route
+- THEN onboarding is shown with an explanatory status
 
 ### Requirement: Free-Form Multi-Currency Counts
 

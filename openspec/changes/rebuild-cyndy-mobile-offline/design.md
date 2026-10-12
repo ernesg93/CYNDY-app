@@ -32,7 +32,7 @@ First use opens onboarding. Valid settings persist before a count route can open
 
 ## Routing and Views
 
-Routes remain `/`, `/onboarding`, `/count/new`, `/history`, `/history/:countId`, `/history/:countId/receipt`, and `/settings`. The count guard redirects invalid or absent configuration to onboarding with focused explanatory status. Controls remain semantic, keyboard-operable, visibly focused, labeled, and at least 24 CSS pixels. Reset remains a two-step confirmation followed by one IndexedDB transaction; cancellation changes nothing.
+Routes remain `/`, `/onboarding`, `/count/new`, `/history`, `/history/:countId`, and `/history/:countId/receipt`. Settings management is deferred beyond onboarding. The count guard redirects invalid or absent configuration to onboarding with focused explanatory status and remains active until every configured currency is valid. Controls remain semantic, keyboard-operable, visibly focused, labeled, and at least 24 CSS pixels. Reset remains a two-step confirmation followed by one IndexedDB transaction; cancellation changes nothing.
 
 ## Interfaces / Contracts
 

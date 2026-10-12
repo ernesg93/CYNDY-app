@@ -41,8 +41,8 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Accessible Local Counting
 
-- [ ] 3.1 RED: add route/component tests for onboarding, invalid-field recovery, and guarded dashboard/direct `/count/new` navigation with focused explanatory status.
-- [ ] 3.2 GREEN: implement `app/src/routes/onboarding`, `settings`, `count`, and accessible shared forms; retain invalid input and persist only valid configurations.
+- [x] 3.1 RED: add route/component tests for onboarding, invalid-field recovery, and guarded dashboard/direct `/count/new` navigation with focused explanatory status.
+- [x] 3.2 GREEN: implement onboarding, guarded dashboard/count placeholders, and accessible shared forms; retain invalid input and persist only valid configurations.
 - [ ] 3.3 RED/GREEN: implement a two-currency count save flow with independent subtotals, snapshots, timestamp, and optional note; prove no aggregate or conversion UI.
 - [ ] 3.4 Implement shell/navigation, skip link, landmarks, visible focus, labels, live errors, and 24px targets; prove keyboard operation.
 

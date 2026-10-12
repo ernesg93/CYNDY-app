@@ -7,7 +7,8 @@ export default defineConfig({
     outDir: "dist",
   },
   test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
+    environment: "jsdom",
+    include: ["src/**/*.test.{ts,tsx}"],
+    pool: "threads",
   },
 });

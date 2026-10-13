@@ -59,7 +59,13 @@ export function resolveRoute(
   if (pathname === "/count/new") return { page: "count" };
   if (pathname === "/history") return { page: "history" };
   const detail = pathname.match(/^\/history\/([^/]+)$/);
-  if (detail) return { page: "detail", countId: decodeURIComponent(detail[1]) };
+  if (detail) {
+    try {
+      return { page: "detail", countId: decodeURIComponent(detail[1]) };
+    } catch {
+      return { page: "not-found" };
+    }
+  }
   return { page: "not-found" };
 }
 

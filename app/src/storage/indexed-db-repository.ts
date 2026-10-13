@@ -43,6 +43,10 @@ interface StoredCurrencyConfigurations {
   readonly configurations: readonly CurrencyConfiguration[];
 }
 
+interface StoredCountRecord extends CountRecord {
+  readonly savedOrder?: number;
+}
+
 export class IndexedDbRepository implements CountRepository {
   private readonly databaseName: string;
   private readonly indexedDB: IDBFactory;
@@ -76,7 +80,13 @@ export class IndexedDbRepository implements CountRepository {
       ...(input.note === undefined ? {} : { note: input.note }),
     };
     const transaction = (await this.open()).transaction(COUNTS_STORE, "readwrite");
-    transaction.objectStore(COUNTS_STORE).add(record);
+    const store = transaction.objectStore(COUNTS_STORE);
+    const existing = await requestResult<StoredCountRecord[]>(store.getAll());
+    const savedOrder = existing.reduce(
+      (latest, saved) => Math.max(latest, saved.savedOrder ?? 0),
+      0,
+    ) + 1;
+    store.add({ ...record, savedOrder } satisfies StoredCountRecord);
     await transactionComplete(transaction);
     return structuredClone(record);
   }
@@ -84,19 +94,22 @@ export class IndexedDbRepository implements CountRepository {
   async getCount(id: string): Promise<CountRecord | undefined> {
     const transaction = (await this.open()).transaction(COUNTS_STORE, "readonly");
     const request = transaction.objectStore(COUNTS_STORE).get(id);
-    const record = await requestResult<CountRecord | undefined>(request);
+    const record = await requestResult<StoredCountRecord | undefined>(request);
     await transactionComplete(transaction);
-    return record;
+    return record ? toCountRecord(record) : undefined;
   }
 
   async listCounts(): Promise<readonly CountRecord[]> {
     const transaction = (await this.open()).transaction(COUNTS_STORE, "readonly");
-    const records = await requestResult<CountRecord[]>(
+    const records = await requestResult<StoredCountRecord[]>(
       transaction.objectStore(COUNTS_STORE).getAll(),
     );
     await transactionComplete(transaction);
-    return structuredClone(records).sort((left, right) =>
-      right.createdAt.localeCompare(left.createdAt));
+    return records.sort((left, right) =>
+      right.createdAt.localeCompare(left.createdAt)
+      || (right.savedOrder ?? 0) - (left.savedOrder ?? 0)
+      || right.id.localeCompare(left.id))
+      .map(toCountRecord);
   }
 
   async getLatestCount(): Promise<CountRecord | undefined> {
@@ -106,20 +119,20 @@ export class IndexedDbRepository implements CountRepository {
   async updateCountNote(id: string, note?: string): Promise<CountRecord> {
     const transaction = (await this.open()).transaction(COUNTS_STORE, "readwrite");
     const store = transaction.objectStore(COUNTS_STORE);
-    const existing = await requestResult<CountRecord | undefined>(store.get(id));
+    const existing = await requestResult<StoredCountRecord | undefined>(store.get(id));
     if (!existing) {
       transaction.abort();
       throw new Error(`Count ${id} was not found`);
     }
 
     const { note: _previousNote, ...unchanged } = existing;
-    const updated: CountRecord = {
+    const updated: StoredCountRecord = {
       ...unchanged,
       ...(note === undefined ? {} : { note }),
     };
     store.put(updated);
     await transactionComplete(transaction);
-    return structuredClone(updated);
+    return toCountRecord(updated);
   }
 
   async deleteCount(id: string): Promise<void> {
@@ -237,6 +250,10 @@ function validateSnapshots(snapshots: readonly CurrencyCountSnapshot[]): void {
       throw new TypeError("Count snapshot subtotal does not match its entries");
     }
   }
+}
+
+function toCountRecord({ savedOrder: _savedOrder, ...record }: StoredCountRecord): CountRecord {
+  return structuredClone(record);
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {

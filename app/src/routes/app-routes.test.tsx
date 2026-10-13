@@ -200,6 +200,16 @@ describe("configuration routes", () => {
     render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
   });
+
+  it("renders the safe not-found view for a malformed encoded history ID", async () => {
+    expect(resolveRoute("/history/%", [validConfiguration])).toEqual({ page: "not-found" });
+    window.history.replaceState({}, "", "/history/%");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+    expect(screen.getByRole("main").id).toBe("main-content");
+    expect(screen.getByRole("link", { name: "Return home" }).getAttribute("href")).toBe("/");
+  });
 });
 
 describe("application shell accessibility", () => {

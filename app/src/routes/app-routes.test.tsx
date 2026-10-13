@@ -14,6 +14,9 @@ import {
 const validConfiguration: CurrencyConfiguration = {
   id: "usd", name: "US dollar", symbol: "$", code: "USD", denominations: [1, 5],
 };
+const secondConfiguration: CurrencyConfiguration = {
+  id: "eur", name: "Euro", symbol: "€", code: "EUR", denominations: [2, 5],
+};
 
 afterEach(() => {
   cleanup();
@@ -31,6 +34,7 @@ function routeRepository(configurations: readonly CurrencyConfiguration[] = []) 
   return {
     getCurrencyConfigurations: vi.fn().mockResolvedValue(configurations),
     saveCurrencyConfigurations: vi.fn().mockResolvedValue(undefined),
+    saveCount: vi.fn().mockResolvedValue(undefined),
   } as unknown as IndexedDbRepository;
 }
 
@@ -64,8 +68,10 @@ describe("configuration routes", () => {
 
   it("blocks navigation until every configured currency is valid", () => {
     const invalid = { ...validConfiguration, code: "" };
+    const duplicate = { ...secondConfiguration, id: "usd", code: " usd " };
     expect(resolveRoute("/", [validConfiguration, invalid]).page).toBe("onboarding");
     expect(resolveRoute("/count/new", [validConfiguration, invalid]).page).toBe("onboarding");
+    expect(resolveRoute("/count/new", [validConfiguration, duplicate]).page).toBe("onboarding");
     expect(resolveRoute("/", [validConfiguration]).page).toBe("dashboard");
   });
 
@@ -141,22 +147,120 @@ describe("configuration routes", () => {
     expect(document.activeElement).toBe(alert);
   });
 
-  it("persists valid onboarding and renders the dashboard", async () => {
+  it("permits onboarding to save two active currencies", async () => {
     const store = routeRepository();
     window.history.replaceState({}, "", "/onboarding");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "Set up CYNDY" });
     fill(validValues());
+    fireEvent.click(screen.getByRole("button", { name: "Add another currency" }));
+    const names = screen.getAllByLabelText("Currency name");
+    const symbols = screen.getAllByLabelText("Symbol");
+    const codes = screen.getAllByLabelText("Currency code");
+    const denominations = screen.getAllByLabelText("Denominations (comma separated)");
+    fireEvent.change(names[1], { target: { value: "Euro" } });
+    fireEvent.change(symbols[1], { target: { value: "€" } });
+    fireEvent.change(codes[1], { target: { value: "EUR" } });
+    fireEvent.change(denominations[1], { target: { value: "2, 5" } });
     fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy());
-    expect(store.saveCurrencyConfigurations).toHaveBeenCalledWith([validConfiguration]);
+    expect(store.saveCurrencyConfigurations).toHaveBeenCalledWith([
+      validConfiguration, secondConfiguration,
+    ]);
     expect(window.location.pathname).toBe("/");
+  });
+
+  it("rejects duplicate currency codes after trimming and case normalization", async () => {
+    const store = routeRepository();
+    window.history.replaceState({}, "", "/onboarding");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Set up CYNDY" });
+    fill(validValues());
+    fireEvent.click(screen.getByRole("button", { name: "Add another currency" }));
+    const names = screen.getAllByLabelText("Currency name");
+    const symbols = screen.getAllByLabelText("Symbol");
+    const codes = screen.getAllByLabelText("Currency code");
+    const denominations = screen.getAllByLabelText("Denominations (comma separated)");
+    fireEvent.change(names[1], { target: { value: "Duplicate dollar" } });
+    fireEvent.change(symbols[1], { target: { value: "US$" } });
+    fireEvent.change(codes[1], { target: { value: " usd " } });
+    fireEvent.change(denominations[1], { target: { value: "1, 10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
+
+    expect(await screen.findAllByText("Currency codes must be unique.")).toHaveLength(2);
+    expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/onboarding");
   });
 
   it("does not expose an out-of-scope settings route", async () => {
     window.history.replaceState({}, "", "/settings");
     render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+  });
+});
+
+describe("new count route", () => {
+  it("saves two independent currency snapshots with an automatic timestamp and note", async () => {
+    const store = new IndexedDbRepository({
+      databaseName: crypto.randomUUID(),
+      indexedDB: new IDBFactory(),
+      createId: () => "count-1",
+      now: () => new Date("2026-10-13T15:00:00.000Z"),
+    });
+    await store.saveCurrencyConfigurations([validConfiguration, secondConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("$5 quantity"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("€2 quantity"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("€5 quantity"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Morning count" } });
+
+    expect(screen.getByText("$13 USD")).toBeTruthy();
+    expect(screen.getByText("€13 EUR")).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/combined total|conversion|exchange|receipt|reconciliation/i);
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Count saved.");
+
+    expect(await store.getCount("count-1")).toEqual({
+      id: "count-1",
+      createdAt: "2026-10-13T15:00:00.000Z",
+      note: "Morning count",
+      snapshots: [
+        {
+          currencyId: "usd", name: "US dollar", symbol: "$", code: "USD",
+          entries: [
+            { denomination: 1, quantity: 3, total: 3 },
+            { denomination: 5, quantity: 2, total: 10 },
+          ],
+          subtotal: 13,
+        },
+        {
+          currencyId: "eur", name: "Euro", symbol: "€", code: "EUR",
+          entries: [
+            { denomination: 2, quantity: 4, total: 8 },
+            { denomination: 5, quantity: 1, total: 5 },
+          ],
+          subtotal: 13,
+        },
+      ],
+    });
+  });
+
+  it.each(["-1", "1.5"])("rejects invalid quantity %s", async (quantity) => {
+    const store = routeRepository([validConfiguration, secondConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: quantity } });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Quantities must be non-negative integers.",
+    );
+    expect(store.saveCount).not.toHaveBeenCalled();
   });
 });

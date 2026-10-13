@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { App } from "../App";
 import type { CurrencyConfiguration } from "../domain/validation";
 import { IndexedDbRepository } from "../storage/indexed-db-repository";
 import {
@@ -102,6 +103,25 @@ describe("configuration routes", () => {
     expect(window.location.pathname).toBe("/onboarding");
   });
 
+  it("clears stale field errors when a corrected configuration cannot be saved", async () => {
+    const store = routeRepository();
+    window.history.replaceState({}, "", "/onboarding");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Set up CYNDY" });
+    fill({ ...validValues(), denominations: "1.5" });
+    fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
+    expect(await screen.findByText("Denominations must be positive integers.")).toBeTruthy();
+
+    vi.mocked(store.saveCurrencyConfigurations).mockRejectedValueOnce(new Error("disk failure"));
+    fill(validValues());
+    fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
+
+    const alert = await screen.findByText("Could not save local settings. Try again.");
+    expect(screen.queryByText("Denominations must be positive integers.")).toBeNull();
+    expect(screen.getByLabelText("Denominations (comma separated)").getAttribute("aria-invalid")).toBeNull();
+    expect(document.activeElement).toBe(alert);
+  });
+
   it("replaces indefinite loading with focused read-failure feedback", async () => {
     const store = routeRepository();
     vi.mocked(store.getCurrencyConfigurations).mockRejectedValueOnce(new Error("read failure"));
@@ -111,6 +131,14 @@ describe("configuration routes", () => {
     expect(alert.textContent).toBe("Could not load local settings. Refresh and try again.");
     expect(document.activeElement).toBe(alert);
     expect(screen.queryByText("Loading local settings…")).toBeNull();
+  });
+
+  it("renders focused feedback when IndexedDB is unavailable during startup", async () => {
+    render(<App createRepository={() => { throw new Error("IndexedDB is unavailable"); }} />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Could not load local settings. Refresh and try again.");
+    expect(document.activeElement).toBe(alert);
   });
 
   it("persists valid onboarding and renders the dashboard", async () => {

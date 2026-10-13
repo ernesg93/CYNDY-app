@@ -129,7 +129,7 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   useEffect(() => {
     if (route?.redirect) window.history.replaceState({}, "", route.redirect);
   }, [route?.redirect]);
-  if (loadError) return <ErrorPage message={loadError} />;
+  if (loadError) return <LocalSettingsErrorPage message={loadError} />;
   if (!configurations || !route) {
     return <main className="app-shell"><p role="status">Loading local settings…</p></main>;
   }
@@ -144,6 +144,7 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
         setConfigurations([result.configuration]);
       }
     } catch {
+      setIssues([]);
       setSaveError("Could not save local settings. Try again.");
     }
   };
@@ -167,7 +168,7 @@ function ConfigurationPage(props: ConfigurationFormProps & { status?: string; er
   </Page>;
 }
 
-function ErrorPage({ message }: { message: string }) {
+export function LocalSettingsErrorPage({ message }: { message: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => { ref.current?.focus(); }, []);
   return <Page title="Local settings unavailable">

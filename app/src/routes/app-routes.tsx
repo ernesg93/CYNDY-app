@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { calculateCountSnapshots, type CountQuantities } from "../domain/count";
 import type { CurrencyConfiguration, ValidationIssue } from "../domain/validation";
 import { validateCurrencyConfiguration } from "../domain/validation";
-import type { IndexedDbRepository } from "../storage/indexed-db-repository";
+import type { CountRecord, IndexedDbRepository } from "../storage/indexed-db-repository";
 
 export interface ConfigurationFormValues {
   name: string;
@@ -16,9 +16,10 @@ const emptyConfiguration: ConfigurationFormValues = {
 };
 
 interface RouteResult {
-  page: "onboarding" | "dashboard" | "count" | "not-found";
+  page: "onboarding" | "dashboard" | "count" | "history" | "detail" | "not-found";
   redirect?: string;
   status?: string;
+  countId?: string;
 }
 
 interface SubmitResult {
@@ -56,6 +57,15 @@ export function resolveRoute(
       : { page: "onboarding" };
   }
   if (pathname === "/count/new") return { page: "count" };
+  if (pathname === "/history") return { page: "history" };
+  const detail = pathname.match(/^\/history\/([^/]+)$/);
+  if (detail) {
+    try {
+      return { page: "detail", countId: decodeURIComponent(detail[1]) };
+    } catch {
+      return { page: "not-found" };
+    }
+  }
   return { page: "not-found" };
 }
 
@@ -196,9 +206,97 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
       onAdd={() => setValues([...values, emptyConfiguration])}
       onSubmit={() => void save()} /></AppShell>;
   }
-  if (route.page === "dashboard") return <AppShell><Page title="Dashboard"><a className="button" href="/count/new">Start a count</a></Page></AppShell>;
+  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} /></AppShell>;
   if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;
+  if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
+  if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} /></AppShell>;
   return <AppShell><Page title="Page not found"><a href="/">Return home</a></Page></AppShell>;
+}
+
+function Dashboard({ repository }: { repository: IndexedDbRepository }) {
+  const [data, setData] = useState<{
+    latest?: CountRecord; counts: readonly CountRecord[];
+  }>();
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    void repository.listCounts()
+      .then((counts) => setData({ latest: counts[0], counts })).catch(() => setError(true));
+  }, [repository]);
+  if (error) return <RecordsError />;
+  if (!data) return <Page title="Dashboard"><p role="status">Loading saved counts…</p></Page>;
+  const statistics = new Map<string, number>();
+  for (const count of data.counts) {
+    for (const snapshot of count.snapshots) {
+      statistics.set(snapshot.code, (statistics.get(snapshot.code) ?? 0) + 1);
+    }
+  }
+  return <Page title="Dashboard">
+    <a className="button" href="/count/new">Start a count</a>{" "}<a href="/history">View history</a>
+    <h2>Latest count</h2>
+    {data.latest ? <>
+      <CountTime record={data.latest} />
+      <SnapshotSubtotals record={data.latest} />
+      <a href={`/history/${encodeURIComponent(data.latest.id)}`}>View latest count</a>
+    </> : <p>No saved counts yet.</p>}
+    <h2>Local statistics</h2>
+    <p>{data.counts.length} saved {data.counts.length === 1 ? "count" : "counts"}</p>
+    <ul>{[...statistics].map(([code, count]) =>
+      <li key={code}>{code}: {count} {count === 1 ? "count" : "counts"}</li>)}</ul>
+  </Page>;
+}
+
+function HistoryPage({ repository }: { repository: IndexedDbRepository }) {
+  const [counts, setCounts] = useState<readonly CountRecord[]>();
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    void repository.listCounts().then(setCounts).catch(() => setError(true));
+  }, [repository]);
+  if (error) return <RecordsError />;
+  return <Page title="History">{counts ? (counts.length ? <ul>{counts.map((count) => <li key={count.id}>
+    <CountTime record={count} /><SnapshotSubtotals record={count} />
+    <a href={`/history/${encodeURIComponent(count.id)}`}>View count {count.id}</a>
+  </li>)}</ul> : <p>No saved counts yet.</p>) : <p role="status">Loading history…</p>}</Page>;
+}
+
+function CountDetailPage({ countId, repository }: {
+  countId: string; repository: IndexedDbRepository;
+}) {
+  const [record, setRecord] = useState<CountRecord | null>();
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    void repository.getCount(countId).then((count) => setRecord(count ?? null)).catch(() => setError(true));
+  }, [countId, repository]);
+  if (error) return <RecordsError />;
+  if (record === undefined) return <Page title="Count details"><p role="status">Loading count…</p></Page>;
+  if (record === null) return <Page title="Count not found"><a href="/history">Return to history</a></Page>;
+  return <Page title="Count details">
+    <CountTime record={record} />
+    {record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
+      <h2>{snapshot.name} ({snapshot.code})</h2>
+      <ul>{snapshot.entries.map((entry) => <li key={entry.denomination}>
+        {snapshot.symbol}{entry.denomination} × {entry.quantity} = {snapshot.symbol}{entry.total}
+      </li>)}</ul>
+      <p>Subtotal: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
+    </section>)}
+    <h2>Note</h2><p>{record.note ?? "No note"}</p>
+    <a href="/history">Return to history</a>
+  </Page>;
+}
+
+function CountTime({ record }: { record: CountRecord }) {
+  return <time dateTime={record.createdAt}>{record.createdAt}</time>;
+}
+
+function SnapshotSubtotals({ record }: { record: CountRecord }) {
+  return <ul>{record.snapshots.map((snapshot) => <li key={snapshot.currencyId}>
+    {snapshot.symbol}{snapshot.subtotal} {snapshot.code}
+  </li>)}</ul>;
+}
+
+function RecordsError() {
+  return <Page title="Saved counts unavailable"><p className="error" role="alert">
+    Could not load saved counts. Refresh and try again.
+  </p></Page>;
 }
 
 interface ConfigurationPageProps {
@@ -321,6 +419,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <nav aria-label="Primary navigation">
         <a href="/">Home</a>
         <a href="/count/new">New count</a>
+        <a href="/history">History</a>
       </nav>
     </header>
     <main id="main-content" className="app-shell" tabIndex={-1}>{children}</main>

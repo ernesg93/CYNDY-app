@@ -35,6 +35,8 @@ function routeRepository(configurations: readonly CurrencyConfiguration[] = []) 
     getCurrencyConfigurations: vi.fn().mockResolvedValue(configurations),
     saveCurrencyConfigurations: vi.fn().mockResolvedValue(undefined),
     saveCount: vi.fn().mockResolvedValue(undefined),
+    listCounts: vi.fn().mockResolvedValue([]),
+    getLatestCount: vi.fn().mockResolvedValue(undefined),
   } as unknown as IndexedDbRepository;
 }
 
@@ -197,6 +199,16 @@ describe("configuration routes", () => {
     window.history.replaceState({}, "", "/settings");
     render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+  });
+
+  it("renders the safe not-found view for a malformed encoded history ID", async () => {
+    expect(resolveRoute("/history/%", [validConfiguration])).toEqual({ page: "not-found" });
+    window.history.replaceState({}, "", "/history/%");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+    expect(screen.getByRole("main").id).toBe("main-content");
+    expect(screen.getByRole("link", { name: "Return home" }).getAttribute("href")).toBe("/");
   });
 });
 

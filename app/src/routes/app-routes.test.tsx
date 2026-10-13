@@ -68,8 +68,10 @@ describe("configuration routes", () => {
 
   it("blocks navigation until every configured currency is valid", () => {
     const invalid = { ...validConfiguration, code: "" };
+    const duplicate = { ...secondConfiguration, id: "usd", code: " usd " };
     expect(resolveRoute("/", [validConfiguration, invalid]).page).toBe("onboarding");
     expect(resolveRoute("/count/new", [validConfiguration, invalid]).page).toBe("onboarding");
+    expect(resolveRoute("/count/new", [validConfiguration, duplicate]).page).toBe("onboarding");
     expect(resolveRoute("/", [validConfiguration]).page).toBe("dashboard");
   });
 
@@ -167,6 +169,28 @@ describe("configuration routes", () => {
       validConfiguration, secondConfiguration,
     ]);
     expect(window.location.pathname).toBe("/");
+  });
+
+  it("rejects duplicate currency codes after trimming and case normalization", async () => {
+    const store = routeRepository();
+    window.history.replaceState({}, "", "/onboarding");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Set up CYNDY" });
+    fill(validValues());
+    fireEvent.click(screen.getByRole("button", { name: "Add another currency" }));
+    const names = screen.getAllByLabelText("Currency name");
+    const symbols = screen.getAllByLabelText("Symbol");
+    const codes = screen.getAllByLabelText("Currency code");
+    const denominations = screen.getAllByLabelText("Denominations (comma separated)");
+    fireEvent.change(names[1], { target: { value: "Duplicate dollar" } });
+    fireEvent.change(symbols[1], { target: { value: "US$" } });
+    fireEvent.change(codes[1], { target: { value: " usd " } });
+    fireEvent.change(denominations[1], { target: { value: "1, 10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
+
+    expect(await screen.findAllByText("Currency codes must be unique.")).toHaveLength(2);
+    expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe("/onboarding");
   });
 
   it("does not expose an out-of-scope settings route", async () => {

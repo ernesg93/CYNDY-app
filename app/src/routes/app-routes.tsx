@@ -40,7 +40,8 @@ export function resolveRoute(
 ): RouteResult {
   const [pathname, query = ""] = path.split("?", 2);
   const valid = configurations.length > 0
-    && configurations.every((item) => validateCurrencyConfiguration(item).length === 0);
+    && configurations.every((item) => validateCurrencyConfiguration(item).length === 0)
+    && findDuplicateCurrencyIndexes(configurations).size === 0;
   if ((pathname === "/" || pathname === "/count/new") && !valid) {
     return {
       page: "onboarding",
@@ -88,9 +89,27 @@ async function submitConfigurations(
   }));
   const issues = configurations.map((configuration) =>
     validateCurrencyConfiguration(configuration).filter((issue) => issue.field !== "id"));
+  for (const index of findDuplicateCurrencyIndexes(configurations)) {
+    issues[index].push({ field: "code", message: "currency codes must be unique" });
+  }
   if (issues.some((item) => item.length > 0)) return { saved: false, issues };
   await repository.saveCurrencyConfigurations(configurations);
   return { saved: true, issues, configurations };
+}
+
+function findDuplicateCurrencyIndexes(
+  configurations: readonly CurrencyConfiguration[],
+): ReadonlySet<number> {
+  const normalizedIds = configurations.map((configuration) => configuration.id.trim().toLowerCase());
+  const normalizedCodes = configurations.map((configuration) => configuration.code.trim().toLowerCase());
+  return new Set(configurations.flatMap((_configuration, index) => {
+    const id = normalizedIds[index];
+    const code = normalizedCodes[index];
+    const duplicateId = id.length > 0 && normalizedIds.indexOf(id) !== normalizedIds.lastIndexOf(id);
+    const duplicateCode = code.length > 0
+      && normalizedCodes.indexOf(code) !== normalizedCodes.lastIndexOf(code);
+    return duplicateId || duplicateCode ? [index] : [];
+  }));
 }
 
 interface ConfigurationFormProps {

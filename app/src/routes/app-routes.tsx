@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { calculateCountSnapshots, type CountQuantities } from "../domain/count";
 import type { CurrencyConfiguration, ValidationIssue } from "../domain/validation";
 import { validateCurrencyConfiguration } from "../domain/validation";
 import type { IndexedDbRepository } from "../storage/indexed-db-repository";
@@ -25,6 +26,12 @@ interface SubmitResult {
   values: ConfigurationFormValues;
   issues: readonly ValidationIssue[];
   configuration?: CurrencyConfiguration;
+}
+
+interface MultiSubmitResult {
+  saved: boolean;
+  issues: readonly (readonly ValidationIssue[])[];
+  configurations?: readonly CurrencyConfiguration[];
 }
 
 export function resolveRoute(
@@ -55,66 +62,81 @@ export async function submitConfiguration(
   repository: Pick<IndexedDbRepository, "saveCurrencyConfigurations">,
   values: ConfigurationFormValues,
 ): Promise<SubmitResult> {
-  const configuration: CurrencyConfiguration = {
-    id: values.code.trim().toLowerCase(),
-    name: values.name,
-    symbol: values.symbol,
-    code: values.code,
-    denominations: values.denominations
+  const result = await submitConfigurations(repository, [values]);
+  return {
+    saved: result.saved,
+    values,
+    issues: result.issues[0] ?? [],
+    configuration: result.configurations?.[0],
+  };
+}
+
+async function submitConfigurations(
+  repository: Pick<IndexedDbRepository, "saveCurrencyConfigurations">,
+  values: readonly ConfigurationFormValues[],
+): Promise<MultiSubmitResult> {
+  const configurations = values.map((item): CurrencyConfiguration => ({
+    id: item.code.trim().toLowerCase(),
+    name: item.name,
+    symbol: item.symbol,
+    code: item.code,
+    denominations: item.denominations
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
       .map(Number),
-  };
-  const issues = validateCurrencyConfiguration(configuration).filter((issue) => issue.field !== "id");
-  if (issues.length > 0) return { saved: false, values, issues };
-  await repository.saveCurrencyConfigurations([configuration]);
-  return { saved: true, values, issues: [], configuration };
+  }));
+  const issues = configurations.map((configuration) =>
+    validateCurrencyConfiguration(configuration).filter((issue) => issue.field !== "id"));
+  if (issues.some((item) => item.length > 0)) return { saved: false, issues };
+  await repository.saveCurrencyConfigurations(configurations);
+  return { saved: true, issues, configurations };
 }
 
 interface ConfigurationFormProps {
   values: ConfigurationFormValues;
   issues: readonly ValidationIssue[];
-  onSubmit: (values: ConfigurationFormValues) => void;
+  index: number;
+  onChange: (values: ConfigurationFormValues) => void;
 }
 
-export function ConfigurationForm({ values, issues, onSubmit }: ConfigurationFormProps) {
-  const [draft, setDraft] = useState(values);
+export function ConfigurationForm({ values, issues, index, onChange }: ConfigurationFormProps) {
   const issueFor = (field: keyof ConfigurationFormValues) =>
     issues.find((issue) => issue.field === field);
   const field = (name: keyof ConfigurationFormValues, label: string) => {
     const issue = issueFor(name);
-    const errorId = `${name}-error`;
+    const inputId = `currency-${index}-${name}`;
+    const errorId = `${inputId}-error`;
     return (
       <div className="field">
-        <label htmlFor={name}>{label}</label>
+        <label htmlFor={inputId}>{label}</label>
         <input
-          id={name}
+          id={inputId}
           name={name}
-          value={draft[name]}
+          value={values[name]}
           aria-invalid={issue ? true : undefined}
           aria-describedby={issue ? errorId : undefined}
-          onChange={(event) => setDraft({ ...draft, [name]: event.target.value })}
+          onChange={(event) => onChange({ ...values, [name]: event.target.value })}
         />
         {issue && <span id={errorId} className="error" role="alert">{formatIssue(issue.message)}</span>}
       </div>
     );
   };
   return (
-    <form onSubmit={(event: FormEvent) => { event.preventDefault(); onSubmit(draft); }} noValidate>
+    <fieldset>
+      <legend>Currency {index + 1}</legend>
       {field("name", "Currency name")}
       {field("symbol", "Symbol")}
       {field("code", "Currency code")}
       {field("denominations", "Denominations (comma separated)")}
-      <button type="submit">Save configuration</button>
-    </form>
+    </fieldset>
   );
 }
 
 export function ApplicationRoutes({ repository }: { repository: IndexedDbRepository }) {
   const [configurations, setConfigurations] = useState<readonly CurrencyConfiguration[] | null>(null);
-  const [values, setValues] = useState<ConfigurationFormValues>(emptyConfiguration);
-  const [issues, setIssues] = useState<readonly ValidationIssue[]>([]);
+  const [values, setValues] = useState<readonly ConfigurationFormValues[]>([emptyConfiguration]);
+  const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
   const [loadError, setLoadError] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
   useEffect(() => {
@@ -133,15 +155,14 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   if (!configurations || !route) {
     return <main className="app-shell"><p role="status">Loading local settings…</p></main>;
   }
-  const save = async (draft: ConfigurationFormValues) => {
-    setValues(draft);
+  const save = async () => {
     setSaveError(undefined);
     try {
-      const result = await submitConfiguration(repository, draft);
+      const result = await submitConfigurations(repository, values);
       setIssues(result.issues);
-      if (result.saved && result.configuration) {
+      if (result.saved && result.configurations) {
         window.history.replaceState({}, "", "/");
-        setConfigurations([result.configuration]);
+        setConfigurations(result.configurations);
       }
     } catch {
       setIssues([]);
@@ -150,22 +171,108 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   };
   if (route.page === "onboarding") {
     return <ConfigurationPage status={route.status} error={saveError}
-      values={values} issues={issues} onSubmit={(draft) => void save(draft)} />;
+      values={values} issues={issues}
+      onChange={(index, draft) => setValues(values.map((item, itemIndex) =>
+        itemIndex === index ? draft : item))}
+      onAdd={() => setValues([...values, emptyConfiguration])}
+      onSubmit={() => void save()} />;
   }
   if (route.page === "dashboard") return <Page title="Dashboard"><a className="button" href="/count/new">Start a count</a></Page>;
-  if (route.page === "count") return <Page title="New count"><p>Your configured currency is ready.</p></Page>;
+  if (route.page === "count") return <CountPage configurations={configurations} repository={repository} />;
   return <Page title="Page not found"><a href="/">Return home</a></Page>;
 }
 
-function ConfigurationPage(props: ConfigurationFormProps & { status?: string; error?: string }) {
+interface ConfigurationPageProps {
+  values: readonly ConfigurationFormValues[];
+  issues: readonly (readonly ValidationIssue[])[];
+  status?: string;
+  error?: string;
+  onChange: (index: number, values: ConfigurationFormValues) => void;
+  onAdd: () => void;
+  onSubmit: () => void;
+}
+
+function ConfigurationPage(props: ConfigurationPageProps) {
   const messageRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => { messageRef.current?.focus(); }, [props.status, props.error]);
   return <Page title="Set up CYNDY">
     {props.error && <p ref={messageRef} className="error" role="alert" tabIndex={-1}>{props.error}</p>}
     {props.status && !props.error && <p ref={messageRef} className="status" role="status" tabIndex={-1}>{props.status}</p>}
-    <p>Add one currency and its positive whole-number denominations.</p>
-    <ConfigurationForm values={props.values} issues={props.issues} onSubmit={props.onSubmit} />
+    <p>Add up to two currencies and their positive whole-number denominations.</p>
+    <form onSubmit={(event: FormEvent) => { event.preventDefault(); props.onSubmit(); }} noValidate>
+      {props.values.map((values, index) => <ConfigurationForm key={index}
+        values={values} issues={props.issues[index] ?? []} index={index}
+        onChange={(draft) => props.onChange(index, draft)} />)}
+      {props.values.length < 2 && <button type="button" onClick={props.onAdd}>Add another currency</button>}
+      <button type="submit">Save configuration</button>
+    </form>
   </Page>;
+}
+
+function CountPage({ configurations, repository }: {
+  configurations: readonly CurrencyConfiguration[];
+  repository: Pick<IndexedDbRepository, "saveCount">;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [note, setNote] = useState("");
+  const [message, setMessage] = useState<string>();
+  const quantities = toQuantities(configurations, draft, false);
+  const snapshots = calculateCountSnapshots(configurations, quantities);
+
+  const save = async (event: FormEvent) => {
+    event.preventDefault();
+    try {
+      const checked = toQuantities(configurations, draft, true);
+      await repository.saveCount({
+        snapshots: calculateCountSnapshots(configurations, checked),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      setMessage("Count saved.");
+    } catch (error) {
+      setMessage(error instanceof TypeError
+        ? "Quantities must be non-negative integers."
+        : "Could not save the count. Try again.");
+    }
+  };
+
+  return <Page title="New count"><form onSubmit={(event) => void save(event)} noValidate>
+    {configurations.map((configuration, currencyIndex) => <fieldset key={configuration.id}>
+      <legend>{configuration.name} ({configuration.code})</legend>
+      {configuration.denominations.map((denomination) => {
+        const key = `${configuration.id}:${denomination}`;
+        return <div className="field" key={key}>
+          <label htmlFor={key}>{configuration.symbol}{denomination} quantity</label>
+          <input id={key} type="number" min="0" step="1" inputMode="numeric"
+            value={draft[key] ?? ""}
+            onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
+        </div>;
+      })}
+      <p>Subtotal: <strong>{configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}</strong></p>
+    </fieldset>)}
+    <div className="field"><label htmlFor="count-note">Note (optional)</label>
+      <input id="count-note" value={note} onChange={(event) => setNote(event.target.value)} />
+    </div>
+    {message && <p className={message === "Count saved." ? "status" : "error"}
+      role={message === "Count saved." ? "status" : "alert"}>{message}</p>}
+    <button type="submit">Save count</button>
+  </form></Page>;
+}
+
+function toQuantities(
+  configurations: readonly CurrencyConfiguration[],
+  draft: Readonly<Record<string, string>>,
+  strict: boolean,
+): CountQuantities {
+  return Object.fromEntries(configurations.map((configuration) => [configuration.id,
+    Object.fromEntries(configuration.denominations.map((denomination) => {
+      const value = draft[`${configuration.id}:${denomination}`] ?? "";
+      const quantity = value === "" ? 0 : Number(value);
+      if (strict && value !== "" && (!/^\d+$/.test(value) || !Number.isSafeInteger(quantity))) {
+        throw new TypeError("Quantities must be non-negative integers");
+      }
+      return [String(denomination), Number.isSafeInteger(quantity) && quantity >= 0 ? quantity : 0];
+    })),
+  ]));
 }
 
 export function LocalSettingsErrorPage({ message }: { message: string }) {

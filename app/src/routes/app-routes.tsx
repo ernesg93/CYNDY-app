@@ -172,7 +172,7 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   }, [route?.redirect]);
   if (loadError) return <LocalSettingsErrorPage message={loadError} />;
   if (!configurations || !route) {
-    return <main className="app-shell"><p role="status">Loading local settings…</p></main>;
+    return <AppShell><p role="status">Loading local settings…</p></AppShell>;
   }
   const save = async () => {
     setSaveError(undefined);
@@ -189,16 +189,16 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
     }
   };
   if (route.page === "onboarding") {
-    return <ConfigurationPage status={route.status} error={saveError}
+    return <AppShell><ConfigurationPage status={route.status} error={saveError}
       values={values} issues={issues}
       onChange={(index, draft) => setValues(values.map((item, itemIndex) =>
         itemIndex === index ? draft : item))}
       onAdd={() => setValues([...values, emptyConfiguration])}
-      onSubmit={() => void save()} />;
+      onSubmit={() => void save()} /></AppShell>;
   }
-  if (route.page === "dashboard") return <Page title="Dashboard"><a className="button" href="/count/new">Start a count</a></Page>;
-  if (route.page === "count") return <CountPage configurations={configurations} repository={repository} />;
-  return <Page title="Page not found"><a href="/">Return home</a></Page>;
+  if (route.page === "dashboard") return <AppShell><Page title="Dashboard"><a className="button" href="/count/new">Start a count</a></Page></AppShell>;
+  if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;
+  return <AppShell><Page title="Page not found"><a href="/">Return home</a></Page></AppShell>;
 }
 
 interface ConfigurationPageProps {
@@ -297,15 +297,34 @@ function toQuantities(
 export function LocalSettingsErrorPage({ message }: { message: string }) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => { ref.current?.focus(); }, []);
-  return <Page title="Local settings unavailable">
+  return <AppShell><Page title="Local settings unavailable">
     <p ref={ref} className="error" role="alert" tabIndex={-1}>{message}</p>
-  </Page>;
+  </Page></AppShell>;
 }
 
 function Page({ title, children }: { title: string; children: React.ReactNode }) {
-  return <main className="app-shell"><section className="card" aria-labelledby="page-title">
+  return <section className="card" aria-labelledby="page-title">
     <h1 id="page-title">{title}</h1>{children}
-  </section></main>;
+  </section>;
+}
+
+function AppShell({ children }: { children: React.ReactNode }) {
+  return <>
+    <a className="skip-link" href="#main-content" onClick={(event) => {
+      event.preventDefault();
+      document.getElementById("main-content")?.focus();
+    }}>
+      Skip to main content
+    </a>
+    <header className="app-header">
+      <a className="brand" href="/" aria-label="CYNDY home">CYNDY</a>
+      <nav aria-label="Primary navigation">
+        <a href="/">Home</a>
+        <a href="/count/new">New count</a>
+      </nav>
+    </header>
+    <main id="main-content" className="app-shell" tabIndex={-1}>{children}</main>
+  </>;
 }
 
 function formatIssue(message: string) {

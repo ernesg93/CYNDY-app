@@ -104,7 +104,7 @@ describe("configuration routes", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Could not save local settings. Try again.");
-    expect(document.activeElement).toBe(alert);
+    await waitFor(() => expect(document.activeElement).toBe(alert));
     expect(screen.getByLabelText("Currency code")).toHaveProperty("value", "USD");
     expect(window.location.pathname).toBe("/onboarding");
   });
@@ -125,7 +125,7 @@ describe("configuration routes", () => {
     const alert = await screen.findByText("Could not save local settings. Try again.");
     expect(screen.queryByText("Denominations must be positive integers.")).toBeNull();
     expect(screen.getByLabelText("Denominations (comma separated)").getAttribute("aria-invalid")).toBeNull();
-    expect(document.activeElement).toBe(alert);
+    await waitFor(() => expect(document.activeElement).toBe(alert));
   });
 
   it("replaces indefinite loading with focused read-failure feedback", async () => {
@@ -135,7 +135,7 @@ describe("configuration routes", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Could not load local settings. Refresh and try again.");
-    expect(document.activeElement).toBe(alert);
+    await waitFor(() => expect(document.activeElement).toBe(alert));
     expect(screen.queryByText("Loading local settings…")).toBeNull();
   });
 
@@ -144,7 +144,7 @@ describe("configuration routes", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toBe("Could not load local settings. Refresh and try again.");
-    expect(document.activeElement).toBe(alert);
+    await waitFor(() => expect(document.activeElement).toBe(alert));
   });
 
   it("permits onboarding to save two active currencies", async () => {
@@ -197,6 +197,50 @@ describe("configuration routes", () => {
     window.history.replaceState({}, "", "/settings");
     render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+  });
+});
+
+describe("application shell accessibility", () => {
+  it.each([
+    ["onboarding", "/onboarding", []],
+    ["dashboard", "/", [validConfiguration]],
+    ["count", "/count/new", [validConfiguration]],
+  ])("keeps semantic landmarks on the %s view", async (_view, path, configurations) => {
+    window.history.replaceState({}, "", path);
+    render(<ApplicationRoutes repository={routeRepository(configurations)} />);
+
+    await screen.findByRole("main");
+    expect(screen.getByRole("banner")).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
+    expect(screen.getByRole("main").id).toBe("main-content");
+    expect(screen.getByRole("link", { name: "CYNDY home" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("link", { name: "New count" }).getAttribute("href")).toBe("/count/new");
+  });
+
+  it("puts an operable skip link first in keyboard order", async () => {
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "Dashboard" });
+
+    const skipLink = screen.getByRole("link", { name: "Skip to main content" });
+    const focusable = document.querySelectorAll("a[href], button, input, [tabindex]");
+    expect(focusable[0]).toBe(skipLink);
+    skipLink.focus();
+    expect(document.activeElement).toBe(skipLink);
+    expect(skipLink.getAttribute("href")).toBe("#main-content");
+    const main = screen.getByRole("main");
+    expect(main.tabIndex).toBe(-1);
+    fireEvent.click(skipLink);
+    expect(document.activeElement).toBe(main);
+  });
+
+  it("uses native keyboard-operable controls with accessible names", async () => {
+    window.history.replaceState({}, "", "/onboarding");
+    render(<ApplicationRoutes repository={routeRepository()} />);
+    await screen.findByRole("heading", { name: "Set up CYNDY" });
+
+    expect(screen.getByRole("button", { name: "Add another currency" }).tagName).toBe("BUTTON");
+    expect(screen.getByRole("button", { name: "Save configuration" }).tagName).toBe("BUTTON");
+    expect(screen.getByLabelText("Currency name").tagName).toBe("INPUT");
   });
 });
 

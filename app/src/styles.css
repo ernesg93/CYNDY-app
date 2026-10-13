@@ -15,10 +15,50 @@ body {
   padding: 1.5rem;
   place-items: center;
 }
-.welcome-card {
+.card {
   width: min(100%, 30rem);
   padding: 2rem;
   border: 1px solid #c7d2c8;
   border-radius: 1rem;
   background: #fff;
+}
+.field {
+  display: grid;
+  gap: 0.35rem;
+  margin-block: 1rem;
+}
+input {
+  min-height: 44px;
+  border: 1px solid #607064;
+  border-radius: 0.4rem;
+  padding: 0.6rem;
+  font: inherit;
+}
+button,
+.button {
+  display: inline-flex;
+  min-width: 24px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0.4rem;
+  padding: 0.6rem 1rem;
+  color: #fff;
+  background: #205c35;
+  font: inherit;
+  text-decoration: none;
+}
+:focus-visible {
+  outline: 3px solid #0759b5;
+  outline-offset: 3px;
+}
+.error {
+  color: #9b1c1c;
+  font-weight: 600;
+}
+.status {
+  border-inline-start: 4px solid #205c35;
+  padding: 0.75rem;
+  background: #e8f3e9;
 }

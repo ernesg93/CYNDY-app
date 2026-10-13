@@ -1,11 +1,22 @@
-export function App() {
-  return (
-    <main className="app-shell">
-      <section aria-labelledby="app-title" className="welcome-card">
-        <h1 id="app-title">CYNDY</h1>
-        <p>Local setup is required before your first count.</p>
-        <p>Your counts will stay on this device.</p>
-      </section>
-    </main>
-  );
+import { useState } from "react";
+import { ApplicationRoutes, LocalSettingsErrorPage } from "./routes/app-routes";
+import { IndexedDbRepository } from "./storage/indexed-db-repository";
+
+interface AppProps {
+  createRepository?: () => IndexedDbRepository;
+}
+
+export function App({ createRepository = () => new IndexedDbRepository() }: AppProps) {
+  const [repository] = useState(() => {
+    try {
+      return createRepository();
+    } catch {
+      return null;
+    }
+  });
+
+  if (!repository) {
+    return <LocalSettingsErrorPage message="Could not load local settings. Refresh and try again." />;
+  }
+  return <ApplicationRoutes repository={repository} />;
 }

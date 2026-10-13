@@ -100,6 +100,23 @@ describe("IndexedDbRepository", () => {
     repository.close();
   });
 
+  it("lists newest counts first and returns the latest count", async () => {
+    let sequence = 0;
+    const dates = ["2026-10-12T10:00:00.000Z", "2026-10-12T12:00:00.000Z"];
+    const repository = new IndexedDbRepository({
+      databaseName: "list-counts-test",
+      indexedDB: new IDBFactory(),
+      createId: () => `count-${++sequence}`,
+      now: () => new Date(dates[sequence - 1]),
+    });
+    await repository.saveCount({ snapshots: countSnapshots(), note: "Earlier" });
+    await repository.saveCount({ snapshots: countSnapshots(), note: "Latest" });
+
+    expect((await repository.listCounts()).map(({ id }) => id)).toEqual(["count-2", "count-1"]);
+    expect(await repository.getLatestCount()).toMatchObject({ id: "count-2", note: "Latest" });
+    repository.close();
+  });
+
   it("deletes only the selected count", async () => {
     let sequence = 0;
     const repository = new IndexedDbRepository({

@@ -35,6 +35,8 @@ function routeRepository(configurations: readonly CurrencyConfiguration[] = []) 
     getCurrencyConfigurations: vi.fn().mockResolvedValue(configurations),
     saveCurrencyConfigurations: vi.fn().mockResolvedValue(undefined),
     saveCount: vi.fn().mockResolvedValue(undefined),
+    listCounts: vi.fn().mockResolvedValue([]),
+    getLatestCount: vi.fn().mockResolvedValue(undefined),
   } as unknown as IndexedDbRepository;
 }
 

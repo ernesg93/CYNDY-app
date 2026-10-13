@@ -48,7 +48,7 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Local Records and Receipt Delivery
 
-- [ ] 4.1 RED/GREEN: implement dashboard, history, and detail from stored snapshots; prove neutral language and no shift, close-out, expected-total, or reconciliation semantics.
+- [x] 4.1 RED/GREEN: implement dashboard, history, and detail from stored snapshots; prove neutral language and no shift, close-out, expected-total, or reconciliation semantics.
 - [ ] 4.2 RED/GREEN: add accessible deletion and two-step reset; prove cancellation preserves data and confirmation atomically clears settings and counts.
 - [ ] 4.3 RED/GREEN: create `app/src/receipts/*`, `ReceiptDestination`, and browser-print delivery; prove snapshot/note output and no Bluetooth/ESC-POS option.
 

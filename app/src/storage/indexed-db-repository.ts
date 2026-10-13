@@ -24,6 +24,8 @@ export interface SaveCountInput {
 export interface CountRepository {
   saveCount(input: SaveCountInput): Promise<CountRecord>;
   getCount(id: string): Promise<CountRecord | undefined>;
+  listCounts(): Promise<readonly CountRecord[]>;
+  getLatestCount(): Promise<CountRecord | undefined>;
   updateCountNote(id: string, note?: string): Promise<CountRecord>;
   deleteCount(id: string): Promise<void>;
   resetAll(): Promise<void>;
@@ -85,6 +87,20 @@ export class IndexedDbRepository implements CountRepository {
     const record = await requestResult<CountRecord | undefined>(request);
     await transactionComplete(transaction);
     return record;
+  }
+
+  async listCounts(): Promise<readonly CountRecord[]> {
+    const transaction = (await this.open()).transaction(COUNTS_STORE, "readonly");
+    const records = await requestResult<CountRecord[]>(
+      transaction.objectStore(COUNTS_STORE).getAll(),
+    );
+    await transactionComplete(transaction);
+    return structuredClone(records).sort((left, right) =>
+      right.createdAt.localeCompare(left.createdAt));
+  }
+
+  async getLatestCount(): Promise<CountRecord | undefined> {
+    return (await this.listCounts())[0];
   }
 
   async updateCountNote(id: string, note?: string): Promise<CountRecord> {

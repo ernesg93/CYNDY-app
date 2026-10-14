@@ -210,6 +210,9 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} onReset={() => {
     window.history.replaceState({}, "", "/onboarding");
     setNotice("All local data was reset.");
+    setValues([emptyConfiguration]);
+    setIssues([[]]);
+    setSaveError(undefined);
     setConfigurations([]);
   }} /></AppShell>;
   if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;

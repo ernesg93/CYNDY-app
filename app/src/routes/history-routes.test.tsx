@@ -191,6 +191,36 @@ describe("stored count routes", () => {
     expect(await repository.listCounts()).toEqual([]);
   });
 
+  it("clears retained configuration drafts after a confirmed reset", async () => {
+    const repository = new IndexedDbRepository({
+      databaseName: crypto.randomUUID(),
+      indexedDB: new IDBFactory(),
+    });
+    window.history.replaceState({}, "", "/onboarding");
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Set up CYNDY" });
+
+    fireEvent.change(screen.getByLabelText("Currency name"), { target: { value: "US dollar" } });
+    fireEvent.change(screen.getByLabelText("Symbol"), { target: { value: "$" } });
+    fireEvent.change(screen.getByLabelText("Currency code"), { target: { value: "USD" } });
+    fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
+      target: { value: "1, 5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
+    await screen.findByRole("heading", { name: "Dashboard" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset all local data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+
+    await screen.findByRole("heading", { name: "Set up CYNDY" });
+    expect(screen.getByLabelText<HTMLInputElement>("Currency name").value).toBe("");
+    expect(screen.getByLabelText<HTMLInputElement>("Symbol").value).toBe("");
+    expect(screen.getByLabelText<HTMLInputElement>("Currency code").value).toBe("");
+    expect(screen.getByLabelText<HTMLInputElement>("Denominations (comma separated)").value)
+      .toBe("");
+  });
+
   it("announces a reset error without leaving the configured dashboard", async () => {
     const repository = await historyRepository();
     vi.spyOn(repository, "resetAll").mockRejectedValueOnce(new Error("failed"));

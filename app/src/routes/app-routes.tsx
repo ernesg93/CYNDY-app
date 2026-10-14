@@ -2,6 +2,11 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { calculateCountSnapshots, type CountQuantities } from "../domain/count";
 import type { CurrencyConfiguration, ValidationIssue } from "../domain/validation";
 import { validateCurrencyConfiguration } from "../domain/validation";
+import {
+  BrowserPrintDestination,
+  type ReceiptDestination,
+} from "../receipts/receipt-destination";
+import { ReceiptView } from "../receipts/receipt-view";
 import type { CountRecord, IndexedDbRepository } from "../storage/indexed-db-repository";
 
 export interface ConfigurationFormValues {
@@ -16,7 +21,7 @@ const emptyConfiguration: ConfigurationFormValues = {
 };
 
 interface RouteResult {
-  page: "onboarding" | "dashboard" | "count" | "history" | "detail" | "not-found";
+  page: "onboarding" | "dashboard" | "count" | "history" | "detail" | "receipt" | "not-found";
   redirect?: string;
   status?: string;
   countId?: string;
@@ -58,6 +63,14 @@ export function resolveRoute(
   }
   if (pathname === "/count/new") return { page: "count" };
   if (pathname === "/history") return { page: "history" };
+  const receipt = pathname.match(/^\/history\/([^/]+)\/receipt$/);
+  if (receipt) {
+    try {
+      return { page: "receipt", countId: decodeURIComponent(receipt[1]) };
+    } catch {
+      return { page: "not-found" };
+    }
+  }
   const detail = pathname.match(/^\/history\/([^/]+)$/);
   if (detail) {
     try {
@@ -162,7 +175,12 @@ export function ConfigurationForm({ values, issues, index, onChange }: Configura
   );
 }
 
-export function ApplicationRoutes({ repository }: { repository: IndexedDbRepository }) {
+const browserPrintDestination = new BrowserPrintDestination();
+
+export function ApplicationRoutes({ repository, receiptDestination = browserPrintDestination }: {
+  repository: IndexedDbRepository;
+  receiptDestination?: ReceiptDestination;
+}) {
   const [configurations, setConfigurations] = useState<readonly CurrencyConfiguration[] | null>(null);
   const [values, setValues] = useState<readonly ConfigurationFormValues[]>([emptyConfiguration]);
   const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
@@ -218,6 +236,8 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
   if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} /></AppShell>;
+  if (route.page === "receipt") return <AppShell><ReceiptPage countId={route.countId!}
+    repository={repository} destination={receiptDestination} /></AppShell>;
   return <AppShell><Page title="Page not found"><a href="/">Return home</a></Page></AppShell>;
 }
 
@@ -326,6 +346,7 @@ function CountDetailPage({ countId, repository }: {
       <p>Subtotal: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
     </section>)}
     <h2>Note</h2><p>{record.note ?? "No note"}</p>
+    <a href={`/history/${encodeURIComponent(record.id)}/receipt`}>Open receipt</a>{" "}
     {deleteError && <p ref={feedbackRef} className="error" role="alert" tabIndex={-1}>
       {deleteError}
     </p>}
@@ -347,6 +368,22 @@ function CountDetailPage({ countId, repository }: {
     {" "}
     <a href="/history">Return to history</a>
   </Page>;
+}
+
+function ReceiptPage({ countId, repository, destination }: {
+  countId: string;
+  repository: IndexedDbRepository;
+  destination: ReceiptDestination;
+}) {
+  const [record, setRecord] = useState<CountRecord | null>();
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    void repository.getCount(countId).then((count) => setRecord(count ?? null)).catch(() => setError(true));
+  }, [countId, repository]);
+  if (error) return <RecordsError />;
+  if (record === undefined) return <Page title="Count receipt"><p role="status">Loading receipt…</p></Page>;
+  if (record === null) return <Page title="Count not found"><a href="/history">Return to history</a></Page>;
+  return <Page title="Count receipt"><ReceiptView record={record} destination={destination} /></Page>;
 }
 
 function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCancel, onConfirm }: {

@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { registerOfflineShell } from "./pwa/register-offline-shell";
 import "./styles.css";
 
 const root = document.querySelector<HTMLDivElement>("#root");
@@ -9,3 +10,15 @@ if (!root) {
 }
 
 createRoot(root).render(<App />);
+
+window.addEventListener(
+  "load",
+  () => {
+    const serviceWorker = "serviceWorker" in navigator ? navigator.serviceWorker : undefined;
+    void registerOfflineShell(serviceWorker, () => {
+      const status = document.querySelector<HTMLElement>("#offline-ready");
+      if (status) status.hidden = false;
+    });
+  },
+  { once: true },
+);

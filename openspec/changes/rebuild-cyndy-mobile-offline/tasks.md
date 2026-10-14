@@ -54,7 +54,7 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: Portable Static Deployment and Verification
 
-- [ ] 5.1 Implement `app/public/manifest.webmanifest` and `app/src/pwa/*` host-neutral precache/registration plus first-load-offline messaging; prove IndexedDB is untouched.
+- [x] 5.1 Implement `app/public/manifest.webmanifest` and `app/src/pwa/*` host-neutral precache/registration plus first-load-offline messaging; prove IndexedDB is untouched.
 - [ ] 5.2 Configure Cloudflare Pages Free from GitHub: `main`, build `app`, output `app/dist`, initial `*.pages.dev` URL, HTTPS, and SPA fallback to `index.html`; use no Workers, Pages Functions, proprietary runtime APIs, bindings, or deployment token.
 - [ ] 5.3 Add `app/e2e/*` and release evidence for warm-load offline, first-load-offline notice, safe unknown routes, `*.pages.dev` HTTPS/SPA behavior, and Android install/offline smoke.
 - [ ] 5.4 Record rollback by deploying a prior static build and host migration by serving the identical `app/dist` on an equivalent HTTPS/SPA-fallback static host; exclude device-local records and all backup/export/auth/conversion features.

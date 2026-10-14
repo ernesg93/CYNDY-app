@@ -118,3 +118,27 @@ button,
 button.danger {
   background: #9b1c1c;
 }
+.receipt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block-start: 1.5rem;
+}
+@media print {
+  .skip-link,
+  .app-header,
+  .receipt-actions {
+    display: none;
+  }
+  .app-shell {
+    display: block;
+    min-height: 0;
+    padding: 0;
+  }
+  .card {
+    width: 100%;
+    border: 0;
+    padding: 0;
+  }
+}

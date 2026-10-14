@@ -62,6 +62,12 @@ describe("offline shell registration", () => {
 });
 
 describe("service worker boundaries", () => {
+  it("generates the worker after Vite emits the final index", () => {
+    const config = readText("../../vite.config.ts");
+
+    expect(config).toMatch(/generateBundle:\s*{\s*order: "post"/);
+  });
+
   it("precaches only the static shell and falls back to it for navigation", () => {
     const source = readText("./service-worker.js");
 

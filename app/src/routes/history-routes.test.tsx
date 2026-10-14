@@ -1,6 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { calculateCountSnapshots } from "../domain/count";
 import type { CurrencyConfiguration } from "../domain/validation";
 import { IndexedDbRepository } from "../storage/indexed-db-repository";
@@ -92,5 +92,122 @@ describe("stored count routes", () => {
     expect(screen.getByText("2026-10-12T10:00:00.000Z").tagName).toBe("TIME");
     expect(screen.queryByText(/JPY|1000/)).toBeNull();
     expectNeutralLanguage();
+  });
+
+  it("cancels deletion without changing the selected count", async () => {
+    const repository = await historyRepository();
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Count details" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete this count" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Delete this count?" });
+    expect(dialog).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Cancel deletion" }),
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel deletion" }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Delete this count" }),
+    ));
+    expect(await repository.getCount("count-1")).toBeTruthy();
+  });
+
+  it("confirms deletion for only the selected count and announces success", async () => {
+    const repository = await historyRepository();
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Count details" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete this count" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Count deleted.");
+    await waitFor(() => expect(document.activeElement).toBe(status));
+    expect(await repository.getCount("count-1")).toBeUndefined();
+    expect(await repository.getCount("count-2")).toBeTruthy();
+  });
+
+  it("announces a deletion error and leaves the count available", async () => {
+    const repository = await historyRepository();
+    const failure = vi.spyOn(repository, "deleteCount").mockRejectedValueOnce(new Error("failed"));
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Count details" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Delete this count" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm deletion" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Could not delete the count. Try again.",
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(alert));
+    expect(failure).toHaveBeenCalledWith("count-1");
+    expect(await repository.getCount("count-1")).toBeTruthy();
+  });
+
+  it("cancels reset at either confirmation without changing settings or counts", async () => {
+    const repository = await historyRepository();
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Dashboard" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset all local data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel reset" }));
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Reset all local data" }),
+    ));
+    expect(await repository.getCurrencyConfigurations()).toHaveLength(1);
+    expect(await repository.listCounts()).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset all local data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
+    expect(screen.getByRole("alertdialog", { name: "Final reset confirmation" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel reset" }));
+
+    await waitFor(() => expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Reset all local data" }),
+    ));
+    expect(await repository.getCurrencyConfigurations()).toHaveLength(1);
+    expect(await repository.listCounts()).toHaveLength(2);
+  });
+
+  it("clears settings and counts after both reset confirmations and returns to onboarding", async () => {
+    const repository = await historyRepository();
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Dashboard" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset all local data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("All local data was reset.");
+    expect(screen.getByRole("heading", { name: "Set up CYNDY" })).toBeTruthy();
+    expect(await repository.getCurrencyConfigurations()).toEqual([]);
+    expect(await repository.listCounts()).toEqual([]);
+  });
+
+  it("announces a reset error without leaving the configured dashboard", async () => {
+    const repository = await historyRepository();
+    vi.spyOn(repository, "resetAll").mockRejectedValueOnce(new Error("failed"));
+    render(<ApplicationRoutes repository={repository} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset all local data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe(
+      "Could not reset local data. Try again.",
+    );
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(alert));
+    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
+    expect(await repository.getCurrencyConfigurations()).toHaveLength(1);
+    expect(await repository.listCounts()).toHaveLength(2);
   });
 });

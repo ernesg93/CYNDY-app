@@ -104,3 +104,17 @@ button,
   padding: 0.75rem;
   background: #e8f3e9;
 }
+.confirmation {
+  width: min(calc(100% - 2rem), 28rem);
+  border: 2px solid #9b1c1c;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+button.danger {
+  background: #9b1c1c;
+}

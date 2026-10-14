@@ -1,0 +1,26 @@
+{
+  "name": "CYNDY",
+  "short_name": "CYNDY",
+  "description": "A local-first cash counting tool.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#16211a",
+  "background_color": "#f2f5ef",
+  "icons": [
+    {
+      "src": "/icons/cyndy-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/cyndy-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

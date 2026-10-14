@@ -168,6 +168,7 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
   const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
   const [loadError, setLoadError] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
   useEffect(() => {
     void repository.getCurrencyConfigurations()
       .then(setConfigurations)
@@ -199,29 +200,43 @@ export function ApplicationRoutes({ repository }: { repository: IndexedDbReposit
     }
   };
   if (route.page === "onboarding") {
-    return <AppShell><ConfigurationPage status={route.status} error={saveError}
+    return <AppShell><ConfigurationPage status={notice ?? route.status} error={saveError}
       values={values} issues={issues}
       onChange={(index, draft) => setValues(values.map((item, itemIndex) =>
         itemIndex === index ? draft : item))}
       onAdd={() => setValues([...values, emptyConfiguration])}
       onSubmit={() => void save()} /></AppShell>;
   }
-  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} /></AppShell>;
+  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} onReset={() => {
+    window.history.replaceState({}, "", "/onboarding");
+    setNotice("All local data was reset.");
+    setValues([emptyConfiguration]);
+    setIssues([[]]);
+    setSaveError(undefined);
+    setConfigurations([]);
+  }} /></AppShell>;
   if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
   if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} /></AppShell>;
   return <AppShell><Page title="Page not found"><a href="/">Return home</a></Page></AppShell>;
 }
 
-function Dashboard({ repository }: { repository: IndexedDbRepository }) {
+function Dashboard({ repository, onReset }: {
+  repository: IndexedDbRepository; onReset: () => void;
+}) {
   const [data, setData] = useState<{
     latest?: CountRecord; counts: readonly CountRecord[];
   }>();
   const [error, setError] = useState(false);
+  const [resetStage, setResetStage] = useState<0 | 1 | 2>(0);
+  const [resetError, setResetError] = useState<string>();
+  const resetButtonRef = useRef<HTMLButtonElement>(null);
+  const resetErrorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     void repository.listCounts()
       .then((counts) => setData({ latest: counts[0], counts })).catch(() => setError(true));
   }, [repository]);
+  useEffect(() => { resetErrorRef.current?.focus(); }, [resetError]);
   if (error) return <RecordsError />;
   if (!data) return <Page title="Dashboard"><p role="status">Loading saved counts…</p></Page>;
   const statistics = new Map<string, number>();
@@ -242,6 +257,29 @@ function Dashboard({ repository }: { repository: IndexedDbRepository }) {
     <p>{data.counts.length} saved {data.counts.length === 1 ? "count" : "counts"}</p>
     <ul>{[...statistics].map(([code, count]) =>
       <li key={code}>{code}: {count} {count === 1 ? "count" : "counts"}</li>)}</ul>
+    <h2>Local data</h2>
+    {resetError && <p ref={resetErrorRef} className="error" role="alert" tabIndex={-1}>
+      {resetError}
+    </p>}
+    {resetStage === 0 ? <button ref={resetButtonRef} type="button" onClick={() => {
+      setResetError(undefined); setResetStage(1);
+    }}>Reset all local data</button> : <ConfirmationPanel
+      title={resetStage === 1 ? "Reset all local data?" : "Final reset confirmation"}
+      description={resetStage === 1
+        ? "This will permanently delete every saved count and all currency settings."
+        : "This cannot be undone. Confirm once more to reset this device."}
+      cancelLabel="Cancel reset"
+      confirmLabel={resetStage === 1 ? "Continue reset" : "Confirm reset"}
+      onCancel={() => {
+        setResetStage(0); setTimeout(() => resetButtonRef.current?.focus());
+      }}
+      onConfirm={() => resetStage === 1 ? setResetStage(2) : void repository.resetAll()
+        .then(onReset)
+        .catch(() => {
+          setResetStage(0);
+          setResetError("Could not reset local data. Try again.");
+        })}
+    />}
   </Page>;
 }
 
@@ -263,11 +301,20 @@ function CountDetailPage({ countId, repository }: {
 }) {
   const [record, setRecord] = useState<CountRecord | null>();
   const [error, setError] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
+  const [deleted, setDeleted] = useState(false);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const feedbackRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     void repository.getCount(countId).then((count) => setRecord(count ?? null)).catch(() => setError(true));
   }, [countId, repository]);
+  useEffect(() => { feedbackRef.current?.focus(); }, [deleteError, deleted]);
   if (error) return <RecordsError />;
   if (record === undefined) return <Page title="Count details"><p role="status">Loading count…</p></Page>;
+  if (deleted) return <Page title="Count deleted"><p ref={feedbackRef} className="status"
+    role="status" tabIndex={-1}>Count deleted.</p>
+    <a href="/history">Return to history</a></Page>;
   if (record === null) return <Page title="Count not found"><a href="/history">Return to history</a></Page>;
   return <Page title="Count details">
     <CountTime record={record} />
@@ -279,8 +326,54 @@ function CountDetailPage({ countId, repository }: {
       <p>Subtotal: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
     </section>)}
     <h2>Note</h2><p>{record.note ?? "No note"}</p>
+    {deleteError && <p ref={feedbackRef} className="error" role="alert" tabIndex={-1}>
+      {deleteError}
+    </p>}
+    {confirmingDelete ? <ConfirmationPanel title="Delete this count?"
+      description="Only this saved count will be permanently deleted."
+      cancelLabel="Cancel deletion" confirmLabel="Confirm deletion"
+      onCancel={() => {
+        setConfirmingDelete(false); setTimeout(() => deleteButtonRef.current?.focus());
+      }}
+      onConfirm={() => void repository.deleteCount(record.id)
+        .then(() => setDeleted(true))
+        .catch(() => {
+          setConfirmingDelete(false);
+          setDeleteError("Could not delete the count. Try again.");
+        })} />
+      : <button ref={deleteButtonRef} type="button" onClick={() => {
+        setDeleteError(undefined); setConfirmingDelete(true);
+      }}>Delete this count</button>}
+    {" "}
     <a href="/history">Return to history</a>
   </Page>;
+}
+
+function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCancel, onConfirm }: {
+  title: string; description: string; cancelLabel: string; confirmLabel: string;
+  onCancel: () => void; onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const id = title.toLowerCase().replace(/\W+/g, "-");
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    cancelRef.current?.focus();
+    return () => { if (dialog.open && typeof dialog.close === "function") dialog.close(); };
+  }, [title]);
+  return <dialog ref={dialogRef} className="confirmation" role="alertdialog"
+    onCancel={(event) => { event.preventDefault(); onCancel(); }}
+    aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}>
+    <h3 id={`${id}-title`}>{title}</h3>
+    <p id={`${id}-description`}>{description}</p>
+    <div className="actions">
+      <button ref={cancelRef} type="button" onClick={onCancel}>{cancelLabel}</button>
+      <button className="danger" type="button" onClick={onConfirm}>{confirmLabel}</button>
+    </div>
+  </dialog>;
 }
 
 function CountTime({ record }: { record: CountRecord }) {

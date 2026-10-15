@@ -9,16 +9,10 @@ if (!root) {
   throw new Error("Application root was not found");
 }
 
-createRoot(root).render(<App />);
+const serviceWorker = "serviceWorker" in navigator ? navigator.serviceWorker : undefined;
+void registerOfflineShell(serviceWorker, () => {
+  const status = document.querySelector<HTMLElement>("#offline-ready");
+  if (status) status.hidden = false;
+});
 
-window.addEventListener(
-  "load",
-  () => {
-    const serviceWorker = "serviceWorker" in navigator ? navigator.serviceWorker : undefined;
-    void registerOfflineShell(serviceWorker, () => {
-      const status = document.querySelector<HTMLElement>("#offline-ready");
-      if (status) status.hidden = false;
-    });
-  },
-  { once: true },
-);
+createRoot(root).render(<App />);

@@ -58,7 +58,7 @@ Fixtures MUST be synthetic and MUST NOT contain real user data. No secret, inclu
 |---|---|---|
 | Unit | Integer totals, no cross-currency aggregate, snapshots, validation | Pure domain tests. |
 | Integration | IndexedDB persistence, note-only edits, transactional reset | Browser IndexedDB repository tests. |
-| E2E | Onboarding, route guard, accessibility, warm-load offline, first-load-offline notice, print invocation | Chromium; Android install/offline smoke before release. |
+| E2E | Onboarding, route guard, accessibility, warm-load offline, safe cold-first browser behavior, print invocation | Chromium; Android install/offline smoke before release. A browser with no cached shell is not expected to render an in-app notice. |
 | Release | `dist` static-only contract, Pages build/deploy, `*.pages.dev` offline smoke, public-repo controls | CI/build inspection plus pre-release checklist. |
 
 ## Threat Matrix

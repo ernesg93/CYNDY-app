@@ -3,7 +3,7 @@ schema: spec-driven
 context: |
   Tech stack: React 19, TypeScript 7, Vite 8, and Vitest 5 under app/.
   Architecture: Static React application with pure domain modules; IndexedDB persistence follows in the next work unit.
-  Testing: Vitest unit tests and TypeScript type checking are available; integration and E2E layers are not established yet.
+  Testing: Vitest unit/integration tests, Playwright Chromium E2E tests, and TypeScript type checking are available.
   Delivery: Stacked-to-main; keep reviewable work units at or below 400 changed lines.
   Baseline: Empty published repository; do not infer application conventions from it.
 
@@ -18,7 +18,7 @@ testing:
   layers:
     unit: true
     integration: false
-    e2e: false
+    e2e: true
   coverage:
     available: false
     command: ""
@@ -26,6 +26,9 @@ testing:
     linter: ""
     type_checker: "cd app && npm run typecheck"
     formatter: ""
+  e2e:
+    command: "cd app && npm run test:e2e"
+    framework: "Playwright Test"
 
 rules:
   proposal:

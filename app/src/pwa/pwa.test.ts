@@ -30,6 +30,16 @@ describe("PWA install metadata", () => {
 });
 
 describe("offline shell registration", () => {
+  it("starts registration during bootstrap instead of waiting for window load", () => {
+    const bootstrap = readText("../main.tsx");
+
+    expect(bootstrap).not.toContain("window.addEventListener");
+    expect(bootstrap.indexOf("void registerOfflineShell(")).toBeGreaterThan(-1);
+    expect(bootstrap.indexOf("void registerOfflineShell(")).toBeLessThan(
+      bootstrap.indexOf("createRoot(root).render"),
+    );
+  });
+
   it("announces offline availability only after an active worker is ready", async () => {
     let activate!: () => void;
     const ready = new Promise<void>((resolve) => {

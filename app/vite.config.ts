@@ -16,12 +16,12 @@ function offlineShellPlugin(): Plugin {
           ["/icons/cyndy-192.svg", "./public/icons/cyndy-192.svg"],
           ["/icons/cyndy-512.svg", "./public/icons/cyndy-512.svg"],
         ] as const;
-        const shellUrls = [
+        const shellUrls = [...new Set([
           "/",
           "/index.html",
           ...publicFiles.map(([url]) => url),
           ...Object.keys(bundle).map((fileName) => `/${fileName}`),
-        ].sort();
+        ])].sort();
         const template = readFileSync(new URL("./src/pwa/service-worker.js", import.meta.url), "utf8");
         const revisionHash = createHash("sha256").update(template);
         for (const output of Object.values(bundle)) {

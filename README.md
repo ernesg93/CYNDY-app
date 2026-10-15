@@ -22,14 +22,17 @@ cd app
 npm ci
 npm test -- --run src/domain
 npm run build
+npm run test:e2e
 npm run dev
 ```
 
 The build requires no environment variables or server runtime. Vite writes the portable static artifact to `app/dist`.
 
-## Planned deployment
+`npm run test:e2e` builds and serves `dist`, then runs Chromium checks for warm and cold offline behavior, unknown routes, and the live Pages deployment. Install the local browser once with `npx playwright install chromium`.
 
-The portable artifact will be `app/dist`. Cloudflare Pages will build from `main` with `app` as the root directory, `npm run build` as the build command, and `dist` as the output directory. The app must require no environment variables, Pages Functions, Workers, bindings, deployment tokens, or vendor storage. Any replacement host only needs HTTPS, static-file serving, and an SPA fallback to `index.html`.
+## Deployment
+
+The app is available at `https://cyndy-app.pages.dev`. Cloudflare Pages builds from `main` with `app` as the root directory, `npm run build` as the build command, and `dist` as the output directory. The deployment requires no environment variables, Pages Functions, Workers, bindings, deployment tokens, or vendor storage. Any replacement host only needs HTTPS, static-file serving, and an SPA fallback to `index.html`.
 
 Deployment and public-repository settings are user-owned actions. See [the pre-release checklist](docs/pre-release-checklist.md) before publication.
 

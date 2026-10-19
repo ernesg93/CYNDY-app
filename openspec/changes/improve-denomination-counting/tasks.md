@@ -50,4 +50,4 @@ Chain strategy: stacked-to-main
 ## Phase 4: Delivery and Rollback Evidence
 
 - [x] 4.1 Open/update the approved issue and PR 1 with baseline reconciliation, explicit non-goals, RED/GREEN command results, runtime/a11y evidence, ≤400 authored-line stat, and rollback limited to Unit 1 files.
-- [ ] 4.2 After PR 1 merges to `main`, open PR 2 from `main` with its independent evidence, ≤400 authored-line stat, and rollback limited to settings/nav files; do not modify active rebuild task checkboxes or Task 5.3.
+- [x] 4.2 After PR 1 merges to `main`, open PR 2 from `main` with its independent evidence, ≤400 authored-line stat, and rollback limited to settings/nav files; do not modify active rebuild task checkboxes or Task 5.3.

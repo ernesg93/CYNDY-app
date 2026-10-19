@@ -34,4 +34,4 @@
 - Work Unit 2 candidate diff: 162 insertions + 13 deletions = 175 authored changed lines.
 - Approved issue: #29 (`status:approved`).
 - Work Unit 1 remains independently merged; Task 5.3 and reset/delete behavior are untouched.
-- PR publication remains pending final diff hygiene, commit, and push.
+- Commit `ed2addd` was pushed and PR #30 opened against `main` with exactly one `type:feature` label; required checks are pending.

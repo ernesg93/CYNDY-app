@@ -21,7 +21,7 @@ const emptyConfiguration: ConfigurationFormValues = {
 };
 
 interface RouteResult {
-  page: "onboarding" | "dashboard" | "count" | "history" | "detail" | "receipt" | "not-found";
+  page: "onboarding" | "dashboard" | "count" | "settings" | "history" | "detail" | "receipt" | "not-found";
   redirect?: string;
   status?: string;
   countId?: string;
@@ -62,6 +62,7 @@ export function resolveRoute(
       : { page: "onboarding" };
   }
   if (pathname === "/count/new") return { page: "count" };
+  if (pathname === "/settings") return { page: "settings" };
   if (pathname === "/history") return { page: "history" };
   const receipt = pathname.match(/^\/history\/([^/]+)\/receipt$/);
   if (receipt) {
@@ -234,6 +235,8 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
     setConfigurations([]);
   }} /></AppShell>;
   if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;
+  if (route.page === "settings") return <AppShell><SettingsPage configurations={configurations}
+    repository={repository} onSaved={setConfigurations} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
   if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} /></AppShell>;
   if (route.page === "receipt") return <AppShell><ReceiptPage countId={route.countId!}
@@ -456,6 +459,61 @@ function ConfigurationPage(props: ConfigurationPageProps) {
   </Page>;
 }
 
+function SettingsPage({ configurations, repository, onSaved }: {
+  configurations: readonly CurrencyConfiguration[];
+  repository: Pick<IndexedDbRepository, "saveCurrencyConfigurations">;
+  onSaved: (configurations: readonly CurrencyConfiguration[]) => void;
+}) {
+  const [values, setValues] = useState<readonly ConfigurationFormValues[]>(() =>
+    configurations.length > 0 ? configurations.map((configuration) => ({
+      name: configuration.name,
+      symbol: configuration.symbol,
+      code: configuration.code,
+      denominations: configuration.denominations.join(", "),
+    })) : [emptyConfiguration]);
+  const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
+  const [message, setMessage] = useState<string>();
+  const [error, setError] = useState<string>();
+  const formRef = useRef<HTMLFormElement>(null);
+  const messageRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+  }, [issues]);
+  useEffect(() => { messageRef.current?.focus(); }, [message, error]);
+
+  const save = async () => {
+    setMessage(undefined);
+    setError(undefined);
+    try {
+      const result = await submitConfigurations(repository, values);
+      setIssues(result.issues);
+      if (result.saved && result.configurations) {
+        onSaved(result.configurations);
+        setMessage("Settings saved.");
+      }
+    } catch {
+      setIssues([]);
+      setError("Could not save local settings. Try again.");
+    }
+  };
+
+  return <Page title="Settings">
+    <p>Edit the currencies and positive whole-number denominations used by future counts.</p>
+    {error && <p ref={messageRef} className="error" role="alert" tabIndex={-1}>{error}</p>}
+    {message && !error && <p ref={messageRef} className="status" role="status" tabIndex={-1}>{message}</p>}
+    <form ref={formRef} onSubmit={(event: FormEvent) => { event.preventDefault(); void save(); }} noValidate>
+      {values.map((item, index) => <ConfigurationForm key={index} values={item}
+        issues={issues[index] ?? []} index={index}
+        onChange={(draft) => setValues(values.map((value, itemIndex) =>
+          itemIndex === index ? draft : value))} />)}
+      {values.length < 2 && <button type="button"
+        onClick={() => setValues([...values, emptyConfiguration])}>Add another currency</button>}
+      <button type="submit">Save settings</button>
+    </form>
+  </Page>;
+}
+
 function CountPage({ configurations, repository }: {
   configurations: readonly CurrencyConfiguration[];
   repository: Pick<IndexedDbRepository, "saveCount">;
@@ -593,6 +651,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <a href="/">Home</a>
         <a href="/count/new">New count</a>
         <a href="/history">History</a>
+        <a href="/settings">Settings</a>
       </nav>
     </header>
     <main id="main-content" className="app-shell" tabIndex={-1}>{children}</main>

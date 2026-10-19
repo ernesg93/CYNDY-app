@@ -195,10 +195,62 @@ describe("configuration routes", () => {
     expect(window.location.pathname).toBe("/onboarding");
   });
 
-  it("does not expose an out-of-scope settings route", async () => {
+  it("keeps settings available to repair an invalid stored configuration", async () => {
+    const invalid = { ...validConfiguration, denominations: [] };
     window.history.replaceState({}, "", "/settings");
-    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
-    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+    render(<ApplicationRoutes repository={routeRepository([invalid])} />);
+
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeTruthy();
+    expect(screen.getByLabelText("Currency name")).toHaveProperty("value", "US dollar");
+    expect(screen.getByLabelText("Denominations (comma separated)")).toHaveProperty("value", "");
+    expect(window.location.pathname).toBe("/settings");
+  });
+
+  it("saves settings for later counts without changing saved snapshots", async () => {
+    const store = repository();
+    await store.saveCurrencyConfigurations([validConfiguration]);
+    const saved = await store.saveCount({ snapshots: [{
+      currencyId: "usd", name: "US dollar", symbol: "$", code: "USD",
+      entries: [{ denomination: 1, quantity: 3, total: 3 }], subtotal: 3,
+    }] });
+    window.history.replaceState({}, "", "/settings");
+    const view = render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Settings" });
+    fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
+      target: { value: "10, 20" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe("Settings saved.");
+    await waitFor(() => expect(document.activeElement).toBe(status));
+    expect((await store.getCount(saved.id))?.snapshots).toEqual(saved.snapshots);
+    view.unmount();
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    expect(screen.getByLabelText("$10 quantity")).toBeTruthy();
+    expect(screen.queryByLabelText("$1 quantity")).toBeNull();
+  });
+
+  it("retains invalid settings, links errors, and does not touch count persistence", async () => {
+    const store = routeRepository([validConfiguration]);
+    window.history.replaceState({}, "", "/settings");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Settings" });
+    const denominations = screen.getByLabelText("Denominations (comma separated)");
+    fireEvent.change(denominations, { target: { value: "5, 5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+
+    expect(await screen.findByText("Denominations must be unique.")).toBeTruthy();
+    expect(denominations).toHaveProperty("value", "5, 5");
+    expect(denominations.getAttribute("aria-invalid")).toBe("true");
+    expect(denominations.getAttribute("aria-describedby")).toBe("currency-0-denominations-error");
+    await waitFor(() => expect(document.activeElement).toBe(denominations));
+    expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
+    expect(store.saveCount).not.toHaveBeenCalled();
+    expect(store.listCounts).not.toHaveBeenCalled();
+    expect(store.getLatestCount).not.toHaveBeenCalled();
   });
 
   it("renders the safe not-found view for a malformed encoded history ID", async () => {
@@ -227,6 +279,7 @@ describe("application shell accessibility", () => {
     expect(screen.getByRole("main").id).toBe("main-content");
     expect(screen.getByRole("link", { name: "CYNDY home" }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("link", { name: "New count" }).getAttribute("href")).toBe("/count/new");
+    expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
   });
 
   it("puts an operable skip link first in keyboard order", async () => {

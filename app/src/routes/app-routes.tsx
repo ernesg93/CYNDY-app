@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { calculateCountSnapshots, type CountQuantities } from "../domain/count";
 import type { CurrencyConfiguration, ValidationIssue } from "../domain/validation";
 import { validateCurrencyConfiguration } from "../domain/validation";
@@ -21,7 +21,7 @@ const emptyConfiguration: ConfigurationFormValues = {
 };
 
 interface RouteResult {
-  page: "onboarding" | "dashboard" | "count" | "history" | "detail" | "receipt" | "not-found";
+  page: "onboarding" | "dashboard" | "count" | "settings" | "history" | "detail" | "receipt" | "not-found";
   redirect?: string;
   status?: string;
   countId?: string;
@@ -38,6 +38,13 @@ interface MultiSubmitResult {
   saved: boolean;
   issues: readonly (readonly ValidationIssue[])[];
   configurations?: readonly CurrencyConfiguration[];
+}
+
+interface CountDraftState {
+  readonly quantities: Readonly<Record<string, string>>;
+  readonly note: string;
+  readonly message?: string;
+  readonly invalidQuantityKeys: ReadonlySet<string>;
 }
 
 export function resolveRoute(
@@ -62,6 +69,7 @@ export function resolveRoute(
       : { page: "onboarding" };
   }
   if (pathname === "/count/new") return { page: "count" };
+  if (pathname === "/settings") return { page: "settings" };
   if (pathname === "/history") return { page: "history" };
   const receipt = pathname.match(/^\/history\/([^/]+)\/receipt$/);
   if (receipt) {
@@ -187,17 +195,26 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
   const [loadError, setLoadError] = useState<string>();
   const [saveError, setSaveError] = useState<string>();
   const [notice, setNotice] = useState<string>();
+  const [path, setPath] = useState(() => `${window.location.pathname}${window.location.search}`);
+  const [countDraft, setCountDraft] = useState<CountDraftState>({
+    quantities: {}, note: "", invalidQuantityKeys: new Set(),
+  });
   useEffect(() => {
     void repository.getCurrencyConfigurations()
       .then(setConfigurations)
       .catch(() => setLoadError("Could not load local settings. Refresh and try again."));
   }, [repository]);
+  useEffect(() => {
+    const syncPath = () => setPath(`${window.location.pathname}${window.location.search}`);
+    window.addEventListener("popstate", syncPath);
+    return () => window.removeEventListener("popstate", syncPath);
+  }, []);
 
   const route = configurations
-    ? resolveRoute(`${window.location.pathname}${window.location.search}`, configurations)
+    ? resolveRoute(path, configurations)
     : null;
   useEffect(() => {
-    if (route?.redirect) window.history.replaceState({}, "", route.redirect);
+    if (route?.redirect) replaceLocation(route.redirect);
   }, [route?.redirect]);
   if (loadError) return <LocalSettingsErrorPage message={loadError} />;
   if (!configurations || !route) {
@@ -209,7 +226,7 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
       const result = await submitConfigurations(repository, values);
       setIssues(result.issues);
       if (result.saved && result.configurations) {
-        window.history.replaceState({}, "", "/");
+        replaceLocation("/");
         setConfigurations(result.configurations);
       }
     } catch {
@@ -226,14 +243,17 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
       onSubmit={() => void save()} /></AppShell>;
   }
   if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} onReset={() => {
-    window.history.replaceState({}, "", "/onboarding");
+    replaceLocation("/onboarding");
     setNotice("All local data was reset.");
     setValues([emptyConfiguration]);
     setIssues([[]]);
     setSaveError(undefined);
     setConfigurations([]);
   }} /></AppShell>;
-  if (route.page === "count") return <AppShell><CountPage configurations={configurations} repository={repository} /></AppShell>;
+  if (route.page === "count") return <AppShell><CountPage configurations={configurations}
+    repository={repository} state={countDraft} onChange={setCountDraft} /></AppShell>;
+  if (route.page === "settings") return <AppShell><SettingsPage configurations={configurations}
+    repository={repository} onSaved={setConfigurations} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
   if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} /></AppShell>;
   if (route.page === "receipt") return <AppShell><ReceiptPage countId={route.countId!}
@@ -456,22 +476,78 @@ function ConfigurationPage(props: ConfigurationPageProps) {
   </Page>;
 }
 
-function CountPage({ configurations, repository }: {
+function SettingsPage({ configurations, repository, onSaved }: {
+  configurations: readonly CurrencyConfiguration[];
+  repository: Pick<IndexedDbRepository, "saveCurrencyConfigurations">;
+  onSaved: (configurations: readonly CurrencyConfiguration[]) => void;
+}) {
+  const [values, setValues] = useState<readonly ConfigurationFormValues[]>(() =>
+    configurations.length > 0 ? configurations.map((configuration) => ({
+      name: configuration.name,
+      symbol: configuration.symbol,
+      code: configuration.code,
+      denominations: configuration.denominations.join(", "),
+    })) : [emptyConfiguration]);
+  const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
+  const [message, setMessage] = useState<string>();
+  const [error, setError] = useState<string>();
+  const formRef = useRef<HTMLFormElement>(null);
+  const messageRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus();
+  }, [issues]);
+  useEffect(() => { messageRef.current?.focus(); }, [message, error]);
+
+  const save = async () => {
+    setMessage(undefined);
+    setError(undefined);
+    try {
+      const result = await submitConfigurations(repository, values);
+      setIssues(result.issues);
+      if (result.saved && result.configurations) {
+        onSaved(result.configurations);
+        setMessage("Settings saved.");
+      }
+    } catch {
+      setIssues([]);
+      setError("Could not save local settings. Try again.");
+    }
+  };
+
+  return <Page title="Settings">
+    <p>Edit the currencies and positive whole-number denominations used by future counts.</p>
+    {error && <p ref={messageRef} className="error" role="alert" tabIndex={-1}>{error}</p>}
+    {message && !error && <p ref={messageRef} className="status" role="status" tabIndex={-1}>{message}</p>}
+    <form ref={formRef} onSubmit={(event: FormEvent) => { event.preventDefault(); void save(); }} noValidate>
+      {values.map((item, index) => <ConfigurationForm key={index} values={item}
+        issues={issues[index] ?? []} index={index}
+        onChange={(draft) => {
+          setValues(values.map((value, itemIndex) => itemIndex === index ? draft : value));
+          setMessage(undefined);
+        }} />)}
+      {values.length < 2 && <button type="button"
+        onClick={() => {
+          setValues([...values, emptyConfiguration]);
+          setMessage(undefined);
+        }}>Add another currency</button>}
+      <button type="submit">Save settings</button>
+    </form>
+  </Page>;
+}
+
+function CountPage({ configurations, repository, state, onChange }: {
   configurations: readonly CurrencyConfiguration[];
   repository: Pick<IndexedDbRepository, "saveCount">;
+  state: CountDraftState;
+  onChange: (update: CountDraftState | ((state: CountDraftState) => CountDraftState)) => void;
 }) {
-  const [draft, setDraft] = useState<Record<string, string>>({});
-  const [note, setNote] = useState("");
-  const [message, setMessage] = useState<string>();
-  const [invalidQuantityKeys, setInvalidQuantityKeys] = useState<ReadonlySet<string>>(new Set());
+  const { quantities: draft, note, message, invalidQuantityKeys } = state;
   const quantities = toQuantities(configurations, draft, false);
   const snapshots = calculateCountSnapshots(configurations, quantities);
 
   const clear = () => {
-    setDraft({});
-    setNote("");
-    setMessage(undefined);
-    setInvalidQuantityKeys(new Set());
+    onChange({ quantities: {}, note: "", invalidQuantityKeys: new Set() });
   };
 
   const save = async (event: FormEvent) => {
@@ -479,22 +555,25 @@ function CountPage({ configurations, repository }: {
     const invalidKeys = new Set(configurations.flatMap((configuration) =>
       configuration.denominations.map((denomination) => `${configuration.id}:${denomination}`)
         .filter((key) => isInvalidQuantity(draft[key] ?? ""))));
-    setInvalidQuantityKeys(invalidKeys);
     if (invalidKeys.size > 0) {
-      setMessage("Quantities must be non-negative integers.");
+      onChange({ ...state, invalidQuantityKeys: invalidKeys,
+        message: "Quantities must be non-negative integers." });
       return;
     }
+    onChange({ ...state, invalidQuantityKeys: invalidKeys });
     try {
       const checked = toQuantities(configurations, draft, true);
       await repository.saveCount({
         snapshots: calculateCountSnapshots(configurations, checked),
         ...(note.trim() ? { note: note.trim() } : {}),
       });
-      setMessage("Count saved.");
+      onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
+        message: "Count saved." }));
     } catch (error) {
-      setMessage(error instanceof TypeError
+      onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
+        message: error instanceof TypeError
         ? "Quantities must be non-negative integers."
-        : "Could not save the count. Try again.");
+        : "Could not save the count. Try again." }));
     }
   };
 
@@ -515,10 +594,10 @@ function CountPage({ configurations, repository }: {
             value={draft[key] ?? ""}
             onChange={(event) => {
               const value = event.target.value;
-              setDraft({ ...draft, [key]: value });
-              if (invalid && !isInvalidQuantity(value)) {
-                setInvalidQuantityKeys(new Set([...invalidQuantityKeys].filter((item) => item !== key)));
-              }
+              onChange({ ...state, quantities: { ...draft, [key]: value },
+                invalidQuantityKeys: invalid && !isInvalidQuantity(value)
+                  ? new Set([...invalidQuantityKeys].filter((item) => item !== key))
+                  : invalidQuantityKeys });
             }} />
           <span id={subtotalId} className="denomination-subtotal">
             = {configuration.symbol}{entry.total}
@@ -533,7 +612,8 @@ function CountPage({ configurations, repository }: {
       </strong></p>
     </fieldset>)}
     <div className="field"><label htmlFor="count-note">Note (optional)</label>
-      <input id="count-note" value={note} onChange={(event) => setNote(event.target.value)} />
+      <input id="count-note" value={note}
+        onChange={(event) => onChange({ ...state, note: event.target.value })} />
     </div>
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{message}</p>}
@@ -591,12 +671,28 @@ function AppShell({ children }: { children: React.ReactNode }) {
       <a className="brand" href="/" aria-label="CYNDY home">CYNDY</a>
       <nav aria-label="Primary navigation">
         <a href="/">Home</a>
-        <a href="/count/new">New count</a>
+        <a href="/count/new" onClick={navigateLocally("/count/new")}>New count</a>
         <a href="/history">History</a>
+        <a href="/settings" onClick={navigateLocally("/settings")}>Settings</a>
       </nav>
     </header>
     <main id="main-content" className="app-shell" tabIndex={-1}>{children}</main>
   </>;
+}
+
+function navigateLocally(path: string) {
+  return (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    window.history.pushState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.setTimeout(() => document.getElementById("main-content")?.focus(), 0);
+  };
+}
+
+function replaceLocation(path: string) {
+  window.history.replaceState({}, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 function formatIssue(message: string) {

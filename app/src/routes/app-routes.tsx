@@ -466,6 +466,12 @@ function CountPage({ configurations, repository }: {
   const quantities = toQuantities(configurations, draft, false);
   const snapshots = calculateCountSnapshots(configurations, quantities);
 
+  const clear = () => {
+    setDraft({});
+    setNote("");
+    setMessage(undefined);
+  };
+
   const save = async (event: FormEvent) => {
     event.preventDefault();
     try {
@@ -485,23 +491,34 @@ function CountPage({ configurations, repository }: {
   return <Page title="New count"><form onSubmit={(event) => void save(event)} noValidate>
     {configurations.map((configuration, currencyIndex) => <fieldset key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
-      {configuration.denominations.map((denomination) => {
-        const key = `${configuration.id}:${denomination}`;
-        return <div className="field" key={key}>
-          <label htmlFor={key}>{configuration.symbol}{denomination} quantity</label>
+      {snapshots[currencyIndex].entries.map((entry) => {
+        const key = `${configuration.id}:${entry.denomination}`;
+        const subtotalId = `${key}-subtotal`;
+        return <div className="denomination-row" key={key}>
+          <label htmlFor={key}>{configuration.symbol}{entry.denomination} ×</label>
           <input id={key} type="number" min="0" step="1" inputMode="numeric"
+            aria-label={`${configuration.symbol}${entry.denomination} quantity`}
+            aria-describedby={subtotalId}
             value={draft[key] ?? ""}
             onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
+          <span id={subtotalId} className="denomination-subtotal">
+            = {configuration.symbol}{entry.total}
+          </span>
         </div>;
       })}
-      <p>Subtotal: <strong>{configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}</strong></p>
+      <p className="currency-total">{configuration.code} total: <strong>
+        {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
+      </strong></p>
     </fieldset>)}
     <div className="field"><label htmlFor="count-note">Note (optional)</label>
       <input id="count-note" value={note} onChange={(event) => setNote(event.target.value)} />
     </div>
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{message}</p>}
-    <button type="submit">Save count</button>
+    <div className="actions">
+      <button type="submit">Save count</button>
+      <button type="button" className="secondary" onClick={clear}>Clear unsaved count</button>
+    </div>
   </form></Page>;
 }
 

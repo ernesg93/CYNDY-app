@@ -76,6 +76,34 @@ input {
   padding: 0.6rem;
   font: inherit;
 }
+input[type="number"] {
+  appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+.denomination-row {
+  display: grid;
+  grid-template-columns: auto minmax(4.5rem, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+.denomination-row input {
+  width: 100%;
+  min-width: 0;
+}
+.denomination-subtotal {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+.currency-total {
+  padding-block-start: 0.75rem;
+  border-block-start: 2px solid #607064;
+  font-size: 1.15rem;
+}
 button,
 .button {
   display: inline-flex;
@@ -94,6 +122,7 @@ button,
 :focus-visible {
   outline: 3px solid #0759b5;
   outline-offset: 3px;
+  scroll-margin-block: 1rem;
 }
 .error {
   color: #9b1c1c;
@@ -117,6 +146,9 @@ button,
 }
 button.danger {
   background: #9b1c1c;
+}
+button.secondary {
+  background: #46524a;
 }
 .receipt-actions {
   display: flex;

@@ -233,6 +233,48 @@ describe("configuration routes", () => {
     expect(screen.queryByLabelText("$1 quantity")).toBeNull();
   });
 
+  it("preserves the unsaved count draft while settings are opened and saved", async () => {
+    const store = routeRepository([validConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "-1" } });
+    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+      target: { value: "Unsaved note" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("link", { name: "Settings" }));
+    await screen.findByRole("heading", { name: "Settings" });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("main")));
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Settings saved.");
+
+    fireEvent.click(screen.getByRole("link", { name: "New count" }));
+    await screen.findByRole("heading", { name: "New count" });
+    expect(screen.getByLabelText("$1 quantity")).toHaveProperty("value", "-1");
+    expect(screen.getByLabelText("Note (optional)")).toHaveProperty("value", "Unsaved note");
+    expect(screen.getByRole("alert").textContent).toBe("Quantities must be non-negative integers.");
+    expect(store.saveCount).not.toHaveBeenCalled();
+  });
+
+  it("removes saved feedback when settings become dirty", async () => {
+    const store = routeRepository([validConfiguration]);
+    window.history.replaceState({}, "", "/settings");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Settings" });
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Settings saved.");
+
+    fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
+      target: { value: "10, 20" },
+    });
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(store.saveCurrencyConfigurations).toHaveBeenCalledTimes(1);
+  });
+
   it("retains invalid settings, links errors, and does not touch count persistence", async () => {
     const store = routeRepository([validConfiguration]);
     window.history.replaceState({}, "", "/settings");

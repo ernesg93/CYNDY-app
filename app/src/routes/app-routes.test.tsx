@@ -324,12 +324,15 @@ describe("new count route", () => {
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
-    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: quantity } });
+    const input = screen.getByLabelText("$1 quantity");
+    fireEvent.change(input, { target: { value: quantity } });
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
 
     expect((await screen.findByRole("alert")).textContent).toBe(
       "Quantities must be non-negative integers.",
     );
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toContain("usd:1-error");
     expect(store.saveCount).not.toHaveBeenCalled();
   });
 
@@ -339,20 +342,25 @@ describe("new count route", () => {
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
     const invalidQuantity = screen.getByLabelText("$1 quantity");
-    const validQuantity = screen.getByLabelText("€2 quantity");
+    const secondInvalidQuantity = screen.getByLabelText("€2 quantity");
     const note = screen.getByLabelText("Note (optional)");
     fireEvent.change(invalidQuantity, { target: { value: "-1" } });
-    fireEvent.change(validQuantity, { target: { value: "4" } });
+    fireEvent.change(secondInvalidQuantity, { target: { value: "1.5" } });
     fireEvent.change(note, { target: { value: "Unsaved note" } });
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(invalidQuantity.getAttribute("aria-invalid")).toBe("true");
+    expect(secondInvalidQuantity.getAttribute("aria-invalid")).toBe("true");
+    expect(invalidQuantity.getAttribute("aria-describedby")).toContain("usd:1-error");
+    expect(screen.getAllByText("Enter a non-negative whole number within the safe integer range.")).toHaveLength(2);
 
     const clear = screen.getByRole("button", { name: "Clear unsaved count" });
     clear.focus();
     fireEvent.click(clear);
 
     expect(invalidQuantity).toHaveProperty("value", "");
-    expect(validQuantity).toHaveProperty("value", "");
+    expect(secondInvalidQuantity).toHaveProperty("value", "");
+    expect(invalidQuantity.getAttribute("aria-invalid")).toBeNull();
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getAllByText(/= [$€]0/)).toHaveLength(4);

@@ -31,7 +31,7 @@
 | Rollback boundary | Revert Settings additions in `app/src/routes/app-routes.tsx`, focused tests in `app/src/routes/app-routes.test.tsx`, and this unit's progress/task marks. Existing configuration keys and saved count snapshots remain readable; no schema/history rollback. |
 
 ## Delivery
-- Work Unit 2 candidate diff: 162 insertions + 13 deletions = 175 authored changed lines.
+- Work Unit 2 candidate diff: 163 insertions + 14 deletions = 177 authored changed lines.
 - Approved issue: #29 (`status:approved`).
 - Work Unit 1 remains independently merged; Task 5.3 and reset/delete behavior are untouched.
 - Commit `ed2addd` was pushed and PR #30 opened against `main` with exactly one `type:feature` label; required checks are pending.

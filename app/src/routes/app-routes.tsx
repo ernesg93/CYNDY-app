@@ -463,11 +463,27 @@ function CountPage({ configurations, repository }: {
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string>();
+  const [invalidQuantityKeys, setInvalidQuantityKeys] = useState<ReadonlySet<string>>(new Set());
   const quantities = toQuantities(configurations, draft, false);
   const snapshots = calculateCountSnapshots(configurations, quantities);
 
+  const clear = () => {
+    setDraft({});
+    setNote("");
+    setMessage(undefined);
+    setInvalidQuantityKeys(new Set());
+  };
+
   const save = async (event: FormEvent) => {
     event.preventDefault();
+    const invalidKeys = new Set(configurations.flatMap((configuration) =>
+      configuration.denominations.map((denomination) => `${configuration.id}:${denomination}`)
+        .filter((key) => isInvalidQuantity(draft[key] ?? ""))));
+    setInvalidQuantityKeys(invalidKeys);
+    if (invalidKeys.size > 0) {
+      setMessage("Quantities must be non-negative integers.");
+      return;
+    }
     try {
       const checked = toQuantities(configurations, draft, true);
       await repository.saveCount({
@@ -485,23 +501,46 @@ function CountPage({ configurations, repository }: {
   return <Page title="New count"><form onSubmit={(event) => void save(event)} noValidate>
     {configurations.map((configuration, currencyIndex) => <fieldset key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
-      {configuration.denominations.map((denomination) => {
-        const key = `${configuration.id}:${denomination}`;
-        return <div className="field" key={key}>
-          <label htmlFor={key}>{configuration.symbol}{denomination} quantity</label>
+      {snapshots[currencyIndex].entries.map((entry) => {
+        const key = `${configuration.id}:${entry.denomination}`;
+        const subtotalId = `${key}-subtotal`;
+        const errorId = `${key}-error`;
+        const invalid = invalidQuantityKeys.has(key);
+        return <div className="denomination-row" key={key}>
+          <label htmlFor={key}>{configuration.symbol}{entry.denomination} ×</label>
           <input id={key} type="number" min="0" step="1" inputMode="numeric"
+            aria-label={`${configuration.symbol}${entry.denomination} quantity`}
+            aria-invalid={invalid ? true : undefined}
+            aria-describedby={`${subtotalId}${invalid ? ` ${errorId}` : ""}`}
             value={draft[key] ?? ""}
-            onChange={(event) => setDraft({ ...draft, [key]: event.target.value })} />
+            onChange={(event) => {
+              const value = event.target.value;
+              setDraft({ ...draft, [key]: value });
+              if (invalid && !isInvalidQuantity(value)) {
+                setInvalidQuantityKeys(new Set([...invalidQuantityKeys].filter((item) => item !== key)));
+              }
+            }} />
+          <span id={subtotalId} className="denomination-subtotal">
+            = {configuration.symbol}{entry.total}
+          </span>
+          {invalid && <span id={errorId} className="error">
+            Enter a non-negative whole number within the safe integer range.
+          </span>}
         </div>;
       })}
-      <p>Subtotal: <strong>{configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}</strong></p>
+      <p className="currency-total">{configuration.code} total: <strong>
+        {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
+      </strong></p>
     </fieldset>)}
     <div className="field"><label htmlFor="count-note">Note (optional)</label>
       <input id="count-note" value={note} onChange={(event) => setNote(event.target.value)} />
     </div>
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{message}</p>}
-    <button type="submit">Save count</button>
+    <div className="actions">
+      <button type="submit">Save count</button>
+      <button type="button" className="secondary" onClick={clear}>Clear unsaved count</button>
+    </div>
   </form></Page>;
 }
 
@@ -514,12 +553,16 @@ function toQuantities(
     Object.fromEntries(configuration.denominations.map((denomination) => {
       const value = draft[`${configuration.id}:${denomination}`] ?? "";
       const quantity = value === "" ? 0 : Number(value);
-      if (strict && value !== "" && (!/^\d+$/.test(value) || !Number.isSafeInteger(quantity))) {
+      if (strict && isInvalidQuantity(value)) {
         throw new TypeError("Quantities must be non-negative integers");
       }
       return [String(denomination), Number.isSafeInteger(quantity) && quantity >= 0 ? quantity : 0];
     })),
   ]));
+}
+
+function isInvalidQuantity(value: string): boolean {
+  return value !== "" && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)));
 }
 
 export function LocalSettingsErrorPage({ message }: { message: string }) {

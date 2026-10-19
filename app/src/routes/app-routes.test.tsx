@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App";
@@ -275,8 +275,21 @@ describe("new count route", () => {
     fireEvent.change(screen.getByLabelText("€5 quantity"), { target: { value: "1" } });
     fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Morning count" } });
 
-    expect(screen.getByText("$13 USD")).toBeTruthy();
-    expect(screen.getByText("€13 EUR")).toBeTruthy();
+    const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
+    const euros = screen.getByRole("group", { name: "Euro (EUR)" });
+    expect(within(dollars).getByText("$1 ×")).toBeTruthy();
+    expect(within(dollars).getByText("= $3")).toBeTruthy();
+    expect(within(dollars).getByText("= $10")).toBeTruthy();
+    expect(within(dollars).getByText("$13 USD")).toBeTruthy();
+    expect(within(euros).getByText("= €8")).toBeTruthy();
+    expect(within(euros).getByText("= €5")).toBeTruthy();
+    expect(within(euros).getByText("€13 EUR")).toBeTruthy();
+    expect(within(dollars).queryByRole("status")).toBeNull();
+    const quantity = screen.getByLabelText("$1 quantity");
+    expect(quantity.getAttribute("type")).toBe("number");
+    expect(quantity.getAttribute("min")).toBe("0");
+    expect(quantity.getAttribute("step")).toBe("1");
+    expect(quantity.getAttribute("inputmode")).toBe("numeric");
     expect(document.body.textContent).not.toMatch(/combined total|conversion|exchange|receipt|reconciliation/i);
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
     expect((await screen.findByRole("status")).textContent).toBe("Count saved.");
@@ -306,17 +319,53 @@ describe("new count route", () => {
     });
   });
 
-  it.each(["-1", "1.5"])("rejects invalid quantity %s", async (quantity) => {
+  it.each(["-1", "1.5", "9007199254740992"])("rejects invalid quantity %s", async (quantity) => {
     const store = routeRepository([validConfiguration, secondConfiguration]);
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
-    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: quantity } });
+    const input = screen.getByLabelText("$1 quantity");
+    fireEvent.change(input, { target: { value: quantity } });
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
 
     expect((await screen.findByRole("alert")).textContent).toBe(
       "Quantities must be non-negative integers.",
     );
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toContain("usd:1-error");
     expect(store.saveCount).not.toHaveBeenCalled();
+  });
+
+  it("clears only the unsaved draft and transient feedback without persistence", async () => {
+    const store = routeRepository([validConfiguration, secondConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    const invalidQuantity = screen.getByLabelText("$1 quantity");
+    const secondInvalidQuantity = screen.getByLabelText("€2 quantity");
+    const note = screen.getByLabelText("Note (optional)");
+    fireEvent.change(invalidQuantity, { target: { value: "-1" } });
+    fireEvent.change(secondInvalidQuantity, { target: { value: "1.5" } });
+    fireEvent.change(note, { target: { value: "Unsaved note" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(invalidQuantity.getAttribute("aria-invalid")).toBe("true");
+    expect(secondInvalidQuantity.getAttribute("aria-invalid")).toBe("true");
+    expect(invalidQuantity.getAttribute("aria-describedby")).toContain("usd:1-error");
+    expect(screen.getAllByText("Enter a non-negative whole number within the safe integer range.")).toHaveLength(2);
+
+    const clear = screen.getByRole("button", { name: "Clear unsaved count" });
+    clear.focus();
+    fireEvent.click(clear);
+
+    expect(invalidQuantity).toHaveProperty("value", "");
+    expect(secondInvalidQuantity).toHaveProperty("value", "");
+    expect(invalidQuantity.getAttribute("aria-invalid")).toBeNull();
+    expect(note).toHaveProperty("value", "");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getAllByText(/= [$€]0/)).toHaveLength(4);
+    expect(document.activeElement).toBe(clear);
+    expect(store.saveCount).not.toHaveBeenCalled();
+    expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
   });
 });

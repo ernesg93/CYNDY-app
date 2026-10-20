@@ -20,9 +20,9 @@ async function snapshotLocalData(page: Page) {
   });
 }
 
-async function configureCountCurrencies(page: Page) {
+async function configureCountCurrencies(page: Page, firstCurrencyName = "US dollar") {
   await page.goto("/onboarding");
-  await page.getByLabel("Currency name").fill("US dollar");
+  await page.getByLabel("Currency name").fill(firstCurrencyName);
   await page.getByLabel("Symbol").fill("$");
   await page.getByLabel("Currency code").fill("USD");
   await page.getByLabel("Denominations (comma separated)").fill(
@@ -37,6 +37,21 @@ async function configureCountCurrencies(page: Page) {
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await page.goto("/count/new");
 }
+
+test("a wrapping currency legend does not overlap its total at wide layouts", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 720 });
+  await configureCountCurrencies(page, "United States dollar cash drawer primary operating currency");
+
+  const firstFieldset = page.locator(".currency-fieldset").first();
+  const legend = firstFieldset.locator(":scope > legend");
+  const total = firstFieldset.locator(":scope > .currency-total");
+  await expect(total).toHaveCSS("position", "static");
+
+  const [legendBox, totalBox] = await Promise.all([legend.boundingBox(), total.boundingBox()]);
+  expect(legendBox).not.toBeNull();
+  expect(totalBox).not.toBeNull();
+  expect(totalBox!.y).toBeGreaterThanOrEqual(legendBox!.y + legendBox!.height);
+});
 
 test("an unknown direct route renders safely without mutating local records", async ({ page }) => {
   await page.goto("/onboarding");

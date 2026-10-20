@@ -581,11 +581,9 @@ function CountPage({ configurations, repository, state, onChange }: {
     {configurations.map((configuration, currencyIndex) =>
       <fieldset className="currency-fieldset" key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
-      <div className="currency-heading">
-        <p className="currency-total">{configuration.code} total: <strong>
-          {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
-        </strong></p>
-      </div>
+      <p className="currency-total">{configuration.code} total: <strong>
+        {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
+      </strong></p>
       {snapshots[currencyIndex].entries.map((entry) => {
         const key = `${configuration.id}:${entry.denomination}`;
         const subtotalId = `${key}-subtotal`;

@@ -99,12 +99,6 @@ input[type="number"]::-webkit-outer-spin-button {
   min-inline-size: 0;
   margin-block: 1rem;
 }
-.currency-heading {
-  display: flex;
-  min-width: 0;
-  justify-content: flex-end;
-  margin-block-start: -1.6rem;
-}
 .denomination-subtotal {
   font-variant-numeric: tabular-nums;
   font-weight: 650;
@@ -165,9 +159,6 @@ button.secondary {
   background: #46524a;
 }
 @media (max-width: 42rem) {
-  .currency-heading {
-    display: contents;
-  }
   .currency-total {
     position: sticky;
     z-index: 1;

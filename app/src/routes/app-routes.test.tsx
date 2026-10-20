@@ -362,9 +362,12 @@ describe("new count route", () => {
     const euros = screen.getByRole("group", { name: "Euro (EUR)" });
     const dollarTotal = within(dollars).getByText("USD total:").closest(".currency-total");
     const euroTotal = within(euros).getByText("EUR total:").closest(".currency-total");
+    const dollarLegend = dollars.querySelector(":scope > legend");
+    const euroLegend = euros.querySelector(":scope > legend");
 
     expect(dollars.classList.contains("currency-fieldset")).toBe(true);
-    expect(dollarTotal?.parentElement?.classList.contains("currency-heading")).toBe(true);
+    expect(dollarLegend?.nextElementSibling).toBe(dollarTotal);
+    expect(euroLegend?.nextElementSibling).toBe(euroTotal);
     expect(within(dollars).getByText("$0 USD")).toBeTruthy();
     expect(within(euros).getByText("€0 EUR")).toBeTruthy();
 

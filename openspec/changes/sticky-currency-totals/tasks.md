@@ -38,7 +38,7 @@ Chain strategy: stacked-to-main
 
 - [x] 3.1 Make the focused component RED tests pass; record exact command/result: `cd app && npm test -- --run src/routes/app-routes.test.tsx`.
 - [x] 3.2 Make Playwright geometry checks pass; record exact command/result: `cd app && npm run test:e2e -- routes.spec.ts`, including compact scrolling, keyboard clearance, reflow, and effective 200% zoom.
-- [ ] 3.3 Run and record `cd app && npm run typecheck`, `cd app && npm test -- --run`, and `cd app && npm run test:e2e`; keep authored additions plus deletions at or below 400, otherwise stop and request chain/exception resolution.
+- [x] 3.3 Run and record `cd app && npm run typecheck`, `cd app && npm test -- --run`, and `cd app && npm run test:e2e`; keep authored additions plus deletions at or below 400, otherwise stop and request chain/exception resolution.
 - [x] 3.4 Before commit/PR, create or link one approved feature issue; publish one conventional-commit work unit and PR with focused-test/runtime evidence, rollback boundary, non-goals, and final `git diff --stat` budget receipt.
 
 ## Apply Evidence
@@ -47,12 +47,12 @@ Chain strategy: stacked-to-main
 |---|---|
 | RED component | `cd app && npm test -- --run src/routes/app-routes.test.tsx` — 1 failed / 28; missing `currency-fieldset`. |
 | RED runtime | `cd app && npm run test:e2e -- routes.spec.ts` — 1 failed / 2; sticky summary locator absent. |
-| GREEN focused | Component: 28/28 passed. Runtime: 2/2 passed. |
-| Full verification | Typecheck passed; focused CountPage Vitest 28/28 passed; the two unrelated timing-sensitive suites passed 12/12 in isolation. The latest full Vitest run finished 65/67 because receipt/history async-loading assertions timed out under the full-suite load; the same full suite passed 67/67 in the prior apply run. Playwright passed 5/5 and production build passed. Task 3.3 remains open pending a clean full-suite/CI result. |
+| GREEN focused | Component: 28/28 passed. Focused runtime after review remediation: 3/3 passed. |
+| Full verification | Typecheck passed; full Vitest passed 67/67; full Playwright passed 6/6; production build passed. |
 | Browser runtime | Playwright MCP at 640×520 with effective 200% zoom confirmed sticky position, no horizontal overflow, natural Tab to `$11 quantity`, focus clearance, and fieldset bounds; at 1024×720 the total was static and passive. |
 | Direct manual screen reader | **Not performed.** Automated semantic assertions cover passive text, no live region, no focusability, and preserved labels; they do not replace direct assistive-technology validation. |
 | Rollback boundary | Revert `app/src/routes/app-routes.tsx`, `app/src/styles.css`, `app/src/routes/app-routes.test.tsx`, and `app/e2e/routes.spec.ts`; no state, route, domain, storage, or persistence behavior changed. |
-| Delivery | Approved issue #33 and stacked implementation PR #34 published. Feature commit: `0c7f6c17fe4f85991939dff7f6c0a2d5db670e18`; app/test rollback remains isolated from this task-state receipt. |
+| Delivery | Approved issue #33 and implementation PR #34 published, then rebased onto merged planning commit `177f32c`; app/test rollback remains isolated from this task-state receipt. |
 
 ## Non-Goals
 

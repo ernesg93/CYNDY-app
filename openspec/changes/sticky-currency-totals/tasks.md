@@ -39,7 +39,7 @@ Chain strategy: stacked-to-main
 - [x] 3.1 Make the focused component RED tests pass; record exact command/result: `cd app && npm test -- --run src/routes/app-routes.test.tsx`.
 - [x] 3.2 Make Playwright geometry checks pass; record exact command/result: `cd app && npm run test:e2e -- routes.spec.ts`, including compact scrolling, keyboard clearance, reflow, and effective 200% zoom.
 - [ ] 3.3 Run and record `cd app && npm run typecheck`, `cd app && npm test -- --run`, and `cd app && npm run test:e2e`; keep authored additions plus deletions at or below 400, otherwise stop and request chain/exception resolution.
-- [ ] 3.4 Before commit/PR, create or link one approved feature issue; publish one conventional-commit work unit and PR with focused-test/runtime evidence, rollback boundary, non-goals, and final `git diff --stat` budget receipt.
+- [x] 3.4 Before commit/PR, create or link one approved feature issue; publish one conventional-commit work unit and PR with focused-test/runtime evidence, rollback boundary, non-goals, and final `git diff --stat` budget receipt.
 
 ## Apply Evidence
 
@@ -52,7 +52,7 @@ Chain strategy: stacked-to-main
 | Browser runtime | Playwright MCP at 640×520 with effective 200% zoom confirmed sticky position, no horizontal overflow, natural Tab to `$11 quantity`, focus clearance, and fieldset bounds; at 1024×720 the total was static and passive. |
 | Direct manual screen reader | **Not performed.** Automated semantic assertions cover passive text, no live region, no focusability, and preserved labels; they do not replace direct assistive-technology validation. |
 | Rollback boundary | Revert `app/src/routes/app-routes.tsx`, `app/src/styles.css`, `app/src/routes/app-routes.test.tsx`, and `app/e2e/routes.spec.ts`; no state, route, domain, storage, or persistence behavior changed. |
-| Delivery | Approved issue #33 created; PR publication remains pending until the implementation commit is pushed. |
+| Delivery | Approved issue #33 and stacked implementation PR #34 published. Feature commit: `0c7f6c17fe4f85991939dff7f6c0a2d5db670e18`; app/test rollback remains isolated from this task-state receipt. |
 
 ## Non-Goals
 

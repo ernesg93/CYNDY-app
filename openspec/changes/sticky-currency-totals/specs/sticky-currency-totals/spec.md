@@ -8,13 +8,13 @@ Keep an individual currency subtotal visible while its denomination rows are bei
 
 ### Requirement: Fieldset-Scoped Total-Only Summary
 
-The system MUST render one compact summary for each active currency fieldset beside its heading. The summary MUST identify that fieldset's currency with its symbol, subtotal, and code, and MUST show only that currency's subtotal. It MUST NOT present a combined, converted, or cross-currency aggregate, denomination-count metadata, or any control.
+The system MUST render one compact summary for each active currency fieldset after its heading. Each fieldset's `<legend>` MUST remain a direct child of that `<fieldset>` and retain its role as the fieldset's accessible name. The summary MUST follow that direct-child legend within the same fieldset, identify that fieldset's currency with its symbol, subtotal, and code, and show only that currency's subtotal. It MUST NOT present a combined, converted, or cross-currency aggregate, denomination-count metadata, or any control.
 
 #### Scenario: Independent currency summaries
 
 - GIVEN two active currency fieldsets with distinct calculated subtotals
 - WHEN both fieldsets are rendered
-- THEN each heading has exactly one summary with only its own symbol, subtotal, and code
+- THEN each fieldset has a direct-child legend followed by exactly one summary with only its own symbol, subtotal, and code
 - AND no page-level or cross-currency total is shown
 
 #### Scenario: Subtotal changes in one fieldset

@@ -24,13 +24,13 @@ Chain strategy: stacked-to-main
 
 ## Phase 1: RED Evidence
 
-- [ ] 1.1 In `app/src/routes/app-routes.test.tsx`, add failing `CountPage` assertions for exactly one group-scoped `CODE total: SYMBOLsubtotal CODE`, independent USD/EUR updates, no aggregate/metadata, no `status`/`alert`/`tabindex`/interactive summary descendants, and retained input labels/descriptions.
+- [ ] 1.1 In `app/src/routes/app-routes.test.tsx`, add failing `CountPage` assertions for a direct-child fieldset `<legend>` followed by exactly one group-scoped `CODE total: SYMBOLsubtotal CODE`, independent USD/EUR updates, no aggregate/metadata, no `status`/`alert`/`tabindex`/interactive summary descendants, and retained input labels/descriptions.
 - [ ] 1.2 Extend the existing clear/save/snapshot tests in `app/src/routes/app-routes.test.tsx` to fail until totals reset after local clear and save keeps existing repository snapshot values.
 - [ ] 1.3 In `app/e2e/routes.spec.ts`, add failing geometry checks on `/count/new`: compact fieldset-bound sticky summary, no next-fieldset overlay, Tab-focused quantity not fully intersected, and no horizontal overflow at effective 200% zoom.
 
 ## Phase 2: GREEN Presentation
 
-- [ ] 2.1 In `CountPage` (`app/src/routes/app-routes.tsx`), move the sole `.currency-total` into semantic `.currency-fieldset`/`.currency-heading` markup beside its `<legend>`; reuse `snapshots[currencyIndex].subtotal` and preserve rows, IDs, validation, clear, save, and snapshot handlers.
+- [ ] 2.1 In `CountPage` (`app/src/routes/app-routes.tsx`), move the sole `.currency-total` to follow the direct-child `<legend>` as a sibling inside semantic `.currency-fieldset` markup; reuse `snapshots[currencyIndex].subtotal` and preserve rows, IDs, validation, clear, save, and snapshot handlers.
 - [ ] 2.2 In `app/src/styles.css`, add wrapping/min-width-safe heading and total rules; at the compact breakpoint apply fieldset-bounded sticky positioning, opaque background, padding, and bounded z-index, while wider layouts remain non-sticky.
 - [ ] 2.3 In `app/src/styles.css`, add compact `.denomination-row input:focus-visible` block-start scroll clearance sized for summary height plus outline; add no focus calls, scripted scrolling, animation, overlay, live region, or controls.
 

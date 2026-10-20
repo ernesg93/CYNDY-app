@@ -352,6 +352,38 @@ describe("application shell accessibility", () => {
 });
 
 describe("new count route", () => {
+  it("renders passive fieldset-scoped totals that update independently", async () => {
+    const store = routeRepository([validConfiguration, secondConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+
+    const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
+    const euros = screen.getByRole("group", { name: "Euro (EUR)" });
+    const dollarTotal = within(dollars).getByText("USD total:").closest(".currency-total");
+    const euroTotal = within(euros).getByText("EUR total:").closest(".currency-total");
+
+    expect(dollars.classList.contains("currency-fieldset")).toBe(true);
+    expect(dollarTotal?.parentElement?.classList.contains("currency-heading")).toBe(true);
+    expect(within(dollars).getByText("$0 USD")).toBeTruthy();
+    expect(within(euros).getByText("€0 EUR")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("$5 quantity"), { target: { value: "2" } });
+    expect(within(dollars).getByText("$10 USD")).toBeTruthy();
+    expect(within(euros).getByText("€0 EUR")).toBeTruthy();
+
+    for (const total of [dollarTotal, euroTotal]) {
+      expect(total?.getAttribute("role")).toBeNull();
+      expect(total?.getAttribute("aria-live")).toBeNull();
+      expect(total?.getAttribute("tabindex")).toBeNull();
+      expect(total?.querySelector("button, a, input, select, textarea, [tabindex]")).toBeNull();
+      expect(total?.textContent).not.toMatch(/combined|converted|denominations|items/i);
+    }
+    expect(within(dollars).queryByRole("status")).toBeNull();
+    expect(within(dollars).queryByRole("alert")).toBeNull();
+    expect(screen.getByLabelText("$5 quantity").getAttribute("aria-describedby")).toBe("usd:5-subtotal");
+  });
+
   it("saves two independent currency snapshots with an automatic timestamp and note", async () => {
     const store = new IndexedDbRepository({
       databaseName: crypto.randomUUID(),
@@ -459,6 +491,8 @@ describe("new count route", () => {
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getAllByText(/= [$€]0/)).toHaveLength(4);
+    expect(screen.getByText("$0 USD")).toBeTruthy();
+    expect(screen.getByText("€0 EUR")).toBeTruthy();
     expect(document.activeElement).toBe(clear);
     expect(store.saveCount).not.toHaveBeenCalled();
     expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();

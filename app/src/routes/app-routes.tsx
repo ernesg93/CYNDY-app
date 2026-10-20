@@ -578,8 +578,14 @@ function CountPage({ configurations, repository, state, onChange }: {
   };
 
   return <Page title="New count"><form onSubmit={(event) => void save(event)} noValidate>
-    {configurations.map((configuration, currencyIndex) => <fieldset key={configuration.id}>
+    {configurations.map((configuration, currencyIndex) =>
+      <fieldset className="currency-fieldset" key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
+      <div className="currency-heading">
+        <p className="currency-total">{configuration.code} total: <strong>
+          {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
+        </strong></p>
+      </div>
       {snapshots[currencyIndex].entries.map((entry) => {
         const key = `${configuration.id}:${entry.denomination}`;
         const subtotalId = `${key}-subtotal`;
@@ -607,9 +613,6 @@ function CountPage({ configurations, repository, state, onChange }: {
           </span>}
         </div>;
       })}
-      <p className="currency-total">{configuration.code} total: <strong>
-        {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
-      </strong></p>
     </fieldset>)}
     <div className="field"><label htmlFor="count-note">Note (optional)</label>
       <input id="count-note" value={note}

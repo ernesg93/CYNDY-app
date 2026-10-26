@@ -19,7 +19,9 @@ function offlineShellPlugin(): Plugin {
         const shellUrls = [...new Set([
           "/",
           ...publicFiles.map(([url]) => url),
-          ...Object.keys(bundle).map((fileName) => `/${fileName}`),
+          ...Object.keys(bundle)
+            .filter((fileName) => fileName !== "index.html")
+            .map((fileName) => `/${fileName}`),
         ])].sort();
         const template = readFileSync(new URL("./src/pwa/service-worker.js", import.meta.url), "utf8");
         const revisionHash = createHash("sha256").update(template);

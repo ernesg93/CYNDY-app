@@ -83,6 +83,7 @@ describe("service worker boundaries", () => {
     const config = readText("../../vite.config.ts");
 
     expect(config).not.toContain('"/index.html"');
+    expect(config).toContain('.filter((fileName) => fileName !== "index.html")');
     expect(source).toContain("caches.open(CACHE_NAME)");
     expect(source).toContain('cache.match("/")');
     expect(source).not.toContain('caches.match("/index.html")');

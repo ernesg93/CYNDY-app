@@ -17,7 +17,7 @@ S2. "realiza tu los puntos que esten a tu alcance."
 - [x] T5 [S1, S2] Analyze and integrate the one missing `origin/main` commit only when Git proves the pre-existing working tree is preserved; do not use stash, reset, or forced operations. Evidence: fast-forwarded `fc42b19` to `dc00504` only after Git proved both commits have the same tree. Commit: inherited upstream merge only.
 - [x] T6 [S1, S2] Define and apply a reviewable CRLF normalization policy after upstream integration, with `.gitattributes`, a narrow diff, and source/test verification when dependencies become available. Evidence: `.gitattributes`; both staged and unstaged `git diff --check` pass. Commit: separate hygiene work unit.
 - [x] T7 [S2] Stop tracking the generated `.atl/skill-registry.md` cache while preserving the local file under the existing `.atl/` ignore rule. Evidence: `git rm --cached` staged the repository removal; `.gitignore` retains the local cache. Commit: separate repository-hygiene work unit.
-- [x] T8 [S2] Review, commit in isolated work units, and push the approved repository changes; exclude the incidental `npm ci` lockfile rewrite. Evidence: `20accba`, `6e29749`, and `1dfc79d` were pushed to `origin/stabilize/cyndy-baseline`; tracking divergence is `0 0`. Commit: final tracking update pending.
+- [x] T8 [S2] Review, commit in isolated work units, and push the approved repository changes; exclude the incidental `npm ci` lockfile rewrite. Evidence: `20accba`, `6e29749`, `1dfc79d`, and `2bb8c9e` were pushed to `origin/stabilize/cyndy-baseline`; tracking divergence is `0 0`. Commit: final tracking update follows.
 
 ## Log
 

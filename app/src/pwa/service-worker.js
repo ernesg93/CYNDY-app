@@ -31,11 +31,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  const cachedResponse =
+  const cachedResponse = caches.open(CACHE_NAME).then((cache) =>
     request.mode === "navigate"
-      ? caches.match("/index.html")
-      : caches.match(request, { ignoreVary: true });
-  event.respondWith(
-    cachedResponse.then((cached) => cached ?? fetch(request)),
+      ? cache.match("/")
+      : cache.match(request, { ignoreVary: true }),
   );
+  event.respondWith(cachedResponse.then((cached) => cached ?? fetch(request)));
 });

@@ -18,7 +18,6 @@ function offlineShellPlugin(): Plugin {
         ] as const;
         const shellUrls = [...new Set([
           "/",
-          "/index.html",
           ...publicFiles.map(([url]) => url),
           ...Object.keys(bundle).map((fileName) => `/${fileName}`),
         ])].sort();

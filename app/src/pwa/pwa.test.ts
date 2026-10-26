@@ -78,13 +78,15 @@ describe("service worker boundaries", () => {
     expect(config).toMatch(/generateBundle:\s*{\s*order: "post"/);
   });
 
-  it("precaches only the static shell and falls back to it for navigation", () => {
+  it("uses the non-redirected root shell from the active cache for navigation", () => {
     const source = readText("./service-worker.js");
+    const config = readText("../../vite.config.ts");
 
-    expect(source).toContain("cache.addAll(PRECACHE_URLS)");
-    expect(source).toContain('request.mode === "navigate"');
-    expect(source).toContain('caches.match("/index.html")');
-    expect(source).toContain("caches.match(request, { ignoreVary: true })");
+    expect(config).not.toContain('"/index.html"');
+    expect(source).toContain("caches.open(CACHE_NAME)");
+    expect(source).toContain('cache.match("/")');
+    expect(source).not.toContain('caches.match("/index.html")');
+    expect(source).toContain("cache.match(request, { ignoreVary: true })");
     expect(source).not.toContain("indexedDB");
     expect(source).not.toContain("cache.put");
   });

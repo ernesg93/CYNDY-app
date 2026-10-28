@@ -286,18 +286,20 @@ function Dashboard({ repository, onReset }: {
     }
   }
   return <Page title="Dashboard">
-    <a className="button" href="/count/new">Start a count</a>{" "}<a href="/history">View history</a>
-    <h2>Latest count</h2>
-    {data.latest ? <>
+    <p className="eyebrow">Local dashboard</p>
+    <p className="dashboard-intro">Review saved counts on this device.</p>
+    <a className="button dashboard-start" href="/count/new">Start a count</a>
+    <section className="dashboard-section" aria-labelledby="latest-count-title"><h2 id="latest-count-title">Latest count</h2>
+    {data.latest ? <article className="dashboard-card">
       <CountTime record={data.latest} />
       <SnapshotSubtotals record={data.latest} />
       <a href={`/history/${encodeURIComponent(data.latest.id)}`}>View latest count</a>
-    </> : <p>No saved counts yet.</p>}
-    <h2>Local statistics</h2>
-    <p>{data.counts.length} saved {data.counts.length === 1 ? "count" : "counts"}</p>
+    </article> : <p>No saved counts yet.</p>}</section>
+    <section className="dashboard-section" aria-labelledby="local-statistics-title"><h2 id="local-statistics-title">Local statistics</h2>
+    <article className="dashboard-card"><p>{data.counts.length} saved {data.counts.length === 1 ? "count" : "counts"}</p>
     <ul>{[...statistics].map(([code, count]) =>
-      <li key={code}>{code}: {count} {count === 1 ? "count" : "counts"}</li>)}</ul>
-    <h2>Local data</h2>
+      <li key={code}>{code}: {count} {count === 1 ? "count" : "counts"}</li>)}</ul></article></section>
+    <section className="dashboard-section dashboard-data" aria-labelledby="local-data-title"><h2 id="local-data-title">Local data</h2>
     {resetError && <p ref={resetErrorRef} className="error" role="alert" tabIndex={-1}>
       {resetError}
     </p>}
@@ -319,7 +321,7 @@ function Dashboard({ repository, onReset }: {
           setResetStage(0);
           setResetError("Could not reset local data. Try again.");
         })}
-    />}
+    />}</section>
   </Page>;
 }
 

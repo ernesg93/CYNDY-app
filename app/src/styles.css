@@ -192,6 +192,18 @@ button.secondary {
 .bottom-nav a { display:grid; min-height:44px; place-content:center; gap:2px; color:#b0c0ba; text-align:center; text-decoration:none; font-size:.75rem; font-weight:700; }
 .app-shell { min-height:calc(100vh - 124px); padding:16px; place-items:start center; }
 .card { width:min(100%, 40rem); padding:20px; border-radius:18px; }
+.eyebrow { margin:0 0 4px; color:#0a7a60; font-size:.75rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.dashboard-intro { color:#52625d; }
+.dashboard-start { width:100%; margin:8px 0 16px; }
+.dashboard-section { margin-top:20px; }
+.dashboard-section h2 { font-size:1.05rem; }
+.dashboard-card { display:grid; gap:12px; padding:12px; border:1px solid #c7d2c8; border-radius:18px; background:#fff; }
+.dashboard-card ul { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; }
+.dashboard-card li { padding:8px; border-radius:12px; background:#edf4f0; font-variant-numeric:tabular-nums; }
+.dashboard-data { margin-top:24px; }
+:root[data-theme="dark"] .card, :root[data-theme="dark"] .dashboard-card { background:#182522; border-color:#43554f; }
+:root[data-theme="dark"] .dashboard-intro { color:#b0c0ba; }
+:root[data-theme="dark"] .dashboard-card li { background:#22312e; }
 @media print {
   .skip-link,
   .app-header,

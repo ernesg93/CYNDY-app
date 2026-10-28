@@ -85,16 +85,24 @@ input[type="number"]::-webkit-outer-spin-button {
   appearance: none;
 }
 .denomination-row {
-  display: grid;
-  grid-template-columns: auto minmax(4.5rem, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  margin-block: 1rem;
+  display:grid;
+  grid-template-columns:72px 12px 76px 12px minmax(0,1fr);
+  gap:4px;
+  align-items:center;
+  margin-block:4px;
 }
-.denomination-row input {
-  width: 100%;
-  min-width: 0;
+.denomination-value,
+.denomination-row input,
+.denomination-subtotal {
+  width:100%; min-width:0; min-height:44px; display:flex; align-items:center;
+  justify-content:flex-end; padding:0 .6rem; border:1px solid #607064;
+  border-radius:.5rem; background:#edf4f0; font-variant-numeric:tabular-nums; font-weight:650;
 }
+.denomination-row input { text-align:right; background:#fff; }
+.row-operator { text-align:center; font-weight:800; }
+:root[data-theme="dark"] .denomination-value,
+:root[data-theme="dark"] .denomination-subtotal { background:#22312e; border-color:#43554f; }
+:root[data-theme="dark"] .denomination-row input { background:#182522; border-color:#43554f; color:#f3f7f4; }
 .currency-fieldset {
   min-inline-size: 0;
   margin-block: 1rem;

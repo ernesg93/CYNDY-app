@@ -421,12 +421,12 @@ describe("new count route", () => {
 
     const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
     const euros = screen.getByRole("group", { name: "Euro (EUR)" });
-    expect(within(dollars).getByText("$1 ×")).toBeTruthy();
-    expect(within(dollars).getByText("= $3")).toBeTruthy();
-    expect(within(dollars).getByText("= $10")).toBeTruthy();
+    expect(within(dollars).getByText("1")).toBeTruthy();
+    expect(within(dollars).getByLabelText("Subtotal: $3 USD")).toBeTruthy();
+    expect(within(dollars).getByLabelText("Subtotal: $10 USD")).toBeTruthy();
     expect(within(dollars).getByText("$13 USD")).toBeTruthy();
-    expect(within(euros).getByText("= €8")).toBeTruthy();
-    expect(within(euros).getByText("= €5")).toBeTruthy();
+    expect(within(euros).getByLabelText("Subtotal: €8 EUR")).toBeTruthy();
+    expect(within(euros).getByLabelText("Subtotal: €5 EUR")).toBeTruthy();
     expect(within(euros).getByText("€13 EUR")).toBeTruthy();
     expect(within(dollars).queryByRole("status")).toBeNull();
     const quantity = screen.getByLabelText("$1 quantity");
@@ -507,7 +507,7 @@ describe("new count route", () => {
     expect(invalidQuantity.getAttribute("aria-invalid")).toBeNull();
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getAllByText(/= [$€]0/)).toHaveLength(4);
+    expect(screen.getAllByLabelText(/Subtotal: [$€]0/)).toHaveLength(4);
     expect(screen.getByText("$0 USD")).toBeTruthy();
     expect(screen.getByText("€0 EUR")).toBeTruthy();
     expect(document.activeElement).toBe(clear);

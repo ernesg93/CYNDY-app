@@ -592,7 +592,8 @@ function CountPage({ configurations, repository, state, onChange }: {
         const errorId = `${key}-error`;
         const invalid = invalidQuantityKeys.has(key);
         return <div className="denomination-row" key={key}>
-          <label htmlFor={key}>{configuration.symbol}{entry.denomination} ×</label>
+          <label className="denomination-value" htmlFor={key}>{entry.denomination}</label>
+          <span className="row-operator" aria-hidden="true">×</span>
           <input id={key} type="number" min="0" step="1" inputMode="numeric"
             aria-label={`${configuration.symbol}${entry.denomination} quantity`}
             aria-invalid={invalid ? true : undefined}
@@ -605,9 +606,9 @@ function CountPage({ configurations, repository, state, onChange }: {
                   ? new Set([...invalidQuantityKeys].filter((item) => item !== key))
                   : invalidQuantityKeys });
             }} />
-          <span id={subtotalId} className="denomination-subtotal">
-            = {configuration.symbol}{entry.total}
-          </span>
+          <span className="row-operator" aria-hidden="true">=</span>
+          <span id={subtotalId} className="denomination-subtotal"
+            aria-label={`Subtotal: ${configuration.symbol}${entry.total} ${configuration.code}`}>{entry.total}</span>
           {invalid && <span id={errorId} className="error">
             Enter a non-negative whole number within the safe integer range.
           </span>}

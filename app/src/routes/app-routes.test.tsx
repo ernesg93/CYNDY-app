@@ -251,7 +251,7 @@ describe("configuration routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
     expect((await screen.findByRole("status")).textContent).toBe("Settings saved.");
 
-    fireEvent.click(screen.getByRole("link", { name: "New count" }));
+    fireEvent.click(screen.getByRole("link", { name: "Count" }));
     await screen.findByRole("heading", { name: "New count" });
     expect(screen.getByLabelText("$1 quantity")).toHaveProperty("value", "-1");
     expect(screen.getByLabelText("Note (optional)")).toHaveProperty("value", "Unsaved note");
@@ -317,11 +317,25 @@ describe("application shell accessibility", () => {
 
     await screen.findByRole("main");
     expect(screen.getByRole("banner")).toBeTruthy();
-    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "CYNDY navigation" })).toBeTruthy();
     expect(screen.getByRole("main").id).toBe("main-content");
     expect(screen.getByRole("link", { name: "CYNDY home" }).getAttribute("href")).toBe("/");
-    expect(screen.getByRole("link", { name: "New count" }).getAttribute("href")).toBe("/count/new");
+    expect(screen.getByRole("link", { name: "Count" }).getAttribute("href")).toBe("/count/new");
     expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+  });
+
+  it("renders the compact module shell with an icon-only home control", async () => {
+    window.localStorage.setItem("cyndy.locale", "es");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "Dashboard" });
+
+    expect(screen.getByRole("link", { name: "Inicio" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("button", { name: "Cambiar tema" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cambiar idioma" })).toBeTruthy();
+    const navigation = screen.getByRole("navigation", { name: "Navegación de CYNDY" });
+    expect(within(navigation).getByRole("link", { name: "Contar" }).getAttribute("href")).toBe("/count/new");
+    expect(within(navigation).getByRole("link", { name: "Historial" }).getAttribute("href")).toBe("/history");
+    expect(within(navigation).getByRole("link", { name: "Ajustes" }).getAttribute("href")).toBe("/settings");
   });
 
   it("puts an operable skip link first in keyboard order", async () => {

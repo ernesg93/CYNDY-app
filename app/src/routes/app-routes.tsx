@@ -661,23 +661,24 @@ function Page({ title, children }: { title: string; children: React.ReactNode })
 }
 
 function AppShell({ children }: { children: React.ReactNode }) {
+  const [locale, setLocale] = useState<"en" | "es">(() => {
+    const stored = localStorage.getItem("cyndy.locale");
+    if (stored === "en" || stored === "es") return stored;
+    return navigator.language.toLowerCase().startsWith("en") ? "en" : "es";
+  });
+  const [dark, setDark] = useState(() => localStorage.getItem("cyndy.theme") !== "light");
+  useEffect(() => { document.documentElement.dataset.theme = dark ? "dark" : "light"; localStorage.setItem("cyndy.theme", dark ? "dark" : "light"); }, [dark]);
+  const es = locale === "es";
+  const words = es ? { home: "Inicio", count: "Contar", history: "Historial", settings: "Ajustes", nav: "Navegación de CYNDY", theme: "Cambiar tema", language: "Cambiar idioma" } : { home: "Home", count: "Count", history: "History", settings: "Settings", nav: "CYNDY navigation", theme: "Change theme", language: "Change language" };
   return <>
-    <a className="skip-link" href="#main-content" onClick={(event) => {
-      event.preventDefault();
-      document.getElementById("main-content")?.focus();
-    }}>
-      Skip to main content
-    </a>
+    <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>Skip to main content</a>
     <header className="app-header">
-      <a className="brand" href="/" aria-label="CYNDY home">CYNDY</a>
-      <nav aria-label="Primary navigation">
-        <a href="/">Home</a>
-        <a href="/count/new" onClick={navigateLocally("/count/new")}>New count</a>
-        <a href="/history">History</a>
-        <a href="/settings" onClick={navigateLocally("/settings")}>Settings</a>
-      </nav>
+      <a className="header-control home-control" href="/" aria-label={words.home}>⌂</a>
+      <a className="brand" href="/" aria-label="CYNDY home"><span aria-hidden="true">C</span> CYNDY</a>
+      <div className="header-actions"><button type="button" className="header-control" aria-label={words.theme} onClick={() => setDark((value) => !value)}>{dark ? "☾" : "☀"}</button><button type="button" className="header-control" aria-label={words.language} onClick={() => { const next = es ? "en" : "es"; localStorage.setItem("cyndy.locale", next); setLocale(next); }}>{es ? "ES" : "EN"}</button></div>
     </header>
     <main id="main-content" className="app-shell" tabIndex={-1}>{children}</main>
+    <nav className="bottom-nav" aria-label={words.nav}><a href="/count/new" aria-label={words.count} onClick={navigateLocally("/count/new")}><span aria-hidden="true">⌗</span><span>{words.count}</span></a><a href="/history" aria-label={words.history} onClick={navigateLocally("/history")}><span aria-hidden="true">◷</span><span>{words.history}</span></a><a href="/settings" aria-label={words.settings} onClick={navigateLocally("/settings")}><span aria-hidden="true">⚙</span><span>{words.settings}</span></a></nav>
   </>;
 }
 

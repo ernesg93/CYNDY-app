@@ -1,0 +1,14 @@
+{
+  "title": "CYNDY Dashboard workflow",
+  "brief": "A 360 px Android-first static Dashboard prototype using only existing local facts: welcome, start-count action, latest saved count with separate currency totals, record statistics, and safe access to history and settings.",
+  "feature": "odd/tasks/cyndy-ui-redesign.md",
+  "artboards": [
+    {
+      "file": "index.html",
+      "title": "Dark Spanish Dashboard and light English Dashboard",
+      "tradeoff": "Makes the local start-and-review workflow immediately scannable while keeping per-currency totals separate instead of introducing a converted aggregate.",
+      "width": 360,
+      "height": 760
+    }
+  ]
+}

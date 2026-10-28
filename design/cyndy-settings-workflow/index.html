@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CYNDY Settings workflow — design prototype</title>
+  <!--
+    NON-PRODUCTION DESIGN PROTOTYPE.
+    Static HTML/CSS source for OpenPencil import and visual review only. It does
+    not implement settings, reset, localisation, persistence, or print behavior.
+  -->
+  <style>
+    :root {
+      --frame-width: 360px;
+      --touch-target: 44px;
+      --radius-frame: 28px;
+      --radius-card: 18px;
+      --radius-control: 12px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      background: #d9dde1;
+      color: #17201e;
+      font-family: var(--font);
+    }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, a:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+    .review-note {
+      max-width: 760px;
+      margin: 24px auto 16px;
+      padding: 0 var(--space-4);
+      color: #27343e;
+      font-size: .875rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .frames {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 32px;
+      padding: 0 var(--space-4) 32px;
+    }
+    .frame-wrap { width: var(--frame-width); }
+    .state-label {
+      display: block;
+      margin: 0 0 var(--space-2);
+      color: #27343e;
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    /* Semantic tokens: each module supplies a complete theme value set. */
+    .module {
+      --canvas: #101719;
+      --surface: #182326;
+      --input: #233236;
+      --text: #f4f7f6;
+      --muted: #acbcba;
+      --border: #405152;
+      --focus: #8ce3cc;
+      --primary: #8ce3cc;
+      --on-primary: #09211d;
+      --destructive: #ffb4ab;
+      --on-destructive: #690005;
+      --destructive-surface: #4a2425;
+      --nav-active: #173c35;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      min-height: 720px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-frame);
+      background: var(--canvas);
+      box-shadow: 0 12px 30px rgb(19 29 35 / 24%);
+      color: var(--text);
+    }
+    .module--light {
+      --canvas: #f8faf8;
+      --surface: #ffffff;
+      --input: #eef4f1;
+      --text: #16201e;
+      --muted: #52615e;
+      --border: #bdccc7;
+      --focus: #006c59;
+      --primary: #006c59;
+      --on-primary: #ffffff;
+      --destructive: #ba1a1a;
+      --on-destructive: #ffffff;
+      --destructive-surface: #ffdad6;
+      --nav-active: #d7f4e9;
+    }
+    .skip-link {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+      transform: translateY(-200%);
+      margin: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-control);
+      background: var(--primary);
+      color: var(--on-primary);
+      font-weight: 800;
+    }
+    .skip-link:focus { transform: translateY(0); }
+    .module-header {
+      position: relative;
+      display: grid;
+      grid-template-columns: var(--touch-target) 1fr var(--touch-target) var(--touch-target);
+      gap: var(--space-2);
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .identity { position: absolute; left: 50%; transform: translateX(-50%); min-width: max-content; }
+    .mark { display: flex; align-items: center; gap: var(--space-2); font-weight: 800; letter-spacing: .06em; }
+    .mark-symbol {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--primary);
+      color: var(--on-primary);
+      font-size: .875rem;
+      letter-spacing: 0;
+    }
+    .context { margin: 2px 0 0 36px; color: var(--muted); font-size: .75rem; font-weight: 700; }
+    .header-control {
+      display: inline-grid;
+      width: var(--touch-target);
+      min-width: var(--touch-target);
+      height: var(--touch-target);
+      place-items: center;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-control);
+      background: var(--input);
+      color: var(--text);
+    }
+    .module-header > button.header-control--theme { grid-column: 3; }
+    .module-header > button.header-control:not(.header-control--theme) { grid-column: 4; }
+    .header-control--theme { border-color: var(--primary); color: var(--primary); }
+    .header-control abbr { border: 0; text-decoration: none; font-size: .75rem; font-weight: 800; }
+    .control-icon { font-size: 1.15rem; line-height: 1; }
+
+    .content {
+      overflow: auto;
+      padding: var(--space-4);
+    }
+    .eyebrow { margin: 0 0 var(--space-1); color: var(--primary); font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 1.55rem; line-height: 1.15; }
+    .intro { margin: var(--space-2) 0 var(--space-4); color: var(--muted); font-size: .875rem; line-height: 1.4; }
+    form { display: grid; gap: var(--space-3); }
+    fieldset {
+      min-width: 0;
+      margin: 0;
+      padding: var(--space-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+    }
+    legend { padding: 0 var(--space-1); color: var(--text); font-size: .875rem; font-weight: 800; }
+    .field { display: grid; gap: var(--space-1); margin-top: var(--space-2); }
+    label { color: var(--muted); font-size: .75rem; font-weight: 750; }
+    input {
+      width: 100%;
+      min-height: var(--touch-target);
+      padding: 0 var(--space-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-control);
+      background: var(--input);
+      color: var(--text);
+    }
+    input[aria-invalid="true"] { border: 2px solid var(--destructive); }
+    .field-error {
+      margin: 0;
+      color: var(--destructive);
+      font-size: .75rem;
+      font-weight: 750;
+      line-height: 1.35;
+    }
+    .field-error::before { content: "! "; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+    .button {
+      display: inline-flex;
+      min-height: var(--touch-target);
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-control);
+      background: var(--input);
+      color: var(--text);
+      font-size: .875rem;
+      font-weight: 800;
+      text-align: center;
+    }
+    .button--primary { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+    .repair-note { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.4; }
+
+    .bottom-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-1);
+      padding: var(--space-2) var(--space-2) max(var(--space-2), env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .nav-item {
+      display: grid;
+      min-height: var(--touch-target);
+      place-content: center;
+      gap: 2px;
+      padding: 4px;
+      border: 0;
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 800;
+    }
+    .nav-icon { color: currentColor; font-size: 1.05rem; line-height: 1; text-align: center; }
+    .nav-item[aria-current="page"] { background: var(--nav-active); color: var(--text); }
+    .nav-item[aria-current="page"] .nav-icon { color: var(--primary); }
+
+    .confirmation-stage { position: relative; padding: var(--space-4); }
+    .dashboard-ghost { display: grid; gap: var(--space-3); opacity: .52; }
+    .ghost-line { height: 12px; border-radius: 99px; background: var(--border); }
+    .ghost-line--short { width: 55%; }
+    .ghost-card { min-height: 98px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); }
+    .dialog-scrim {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      align-items: center;
+      padding: var(--space-4);
+      background: rgb(22 32 30 / 48%);
+    }
+    .confirmation {
+      padding: var(--space-4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+      box-shadow: 0 16px 36px rgb(0 0 0 / 28%);
+    }
+    /* Explicit light-dialog values retain contrast after OpenPencil flattens the scrim. */
+    .module--light .confirmation { background: #ffffff; color: #16201e; }
+    .module--light .confirmation .danger-kicker { color: #ba1a1a; }
+    .module--light .confirmation p:not(.danger-kicker) { color: #52615e; }
+    .module--light .confirmation .button { background: #eef4f1; color: #16201e; }
+    .module--light .confirmation .button--destructive { background: #ba1a1a; color: #ffffff; }
+    .danger-kicker { margin: 0 0 var(--space-2); color: var(--destructive); font-size: .75rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .confirmation h1 { font-size: 1.3rem; }
+    .confirmation p:not(.danger-kicker) { margin: var(--space-2) 0 var(--space-4); color: var(--muted); font-size: .875rem; line-height: 1.45; }
+    .dialog-actions { display: grid; grid-template-columns: 1fr; gap: var(--space-2); }
+    .button--destructive { border-color: var(--destructive); background: var(--destructive); color: var(--on-destructive); }
+
+    @media (max-width: 399px) {
+      body { min-width: 0; }
+      .review-note { text-align: left; }
+      .frames { padding-right: 0; padding-left: 0; }
+      .frame-wrap { width: 100%; }
+      .module { width: 100%; border-right: 0; border-left: 0; border-radius: 0; }
+    }
+    @media (forced-colors: active) {
+      .module, fieldset, input, .header-control, .bottom-nav, .confirmation { border-color: CanvasText; }
+      .nav-item[aria-current="page"], input[aria-invalid="true"] { outline: 2px solid CanvasText; }
+    }
+  </style>
+</head>
+<body>
+  <p class="review-note"><strong>Design-only static prototype.</strong> Two 360 px Android-first CYNDY settings states for OpenPencil import: a Spanish repair form with a field-level validation error and an English destructive-reset confirmation. No parent host or future print flow is shown.</p>
+
+  <main class="frames" aria-label="CYNDY Settings workflow states">
+    <section class="frame-wrap" aria-labelledby="settings-state">
+      <span class="state-label" id="settings-state">Dark · Español · Ajustes con error</span>
+      <article class="module" lang="es">
+        <a class="skip-link" href="#settings-content">Saltar al contenido</a>
+        <header class="module-header">
+          <a class="header-control" href="/" aria-label="Panel de inicio"><span class="control-icon" aria-hidden="true">⌂</span></a>
+          <div class="identity"><div class="mark"><span class="mark-symbol" aria-hidden="true">C</span>CYNDY</div></div>
+          <button class="header-control header-control--theme" type="button" aria-label="Tema oscuro activo; cambiar tema"><span class="control-icon" aria-hidden="true">☾</span></button>
+          <button class="header-control" type="button" aria-label="Idioma seleccionado: español"><abbr title="Español">ES</abbr></button>
+        </header>
+        <section class="content" id="settings-content" tabindex="-1" aria-labelledby="settings-title">
+          <p class="eyebrow">Ajustes locales</p>
+          <h1 id="settings-title">Monedas y denominaciones</h1>
+          <p class="intro">Edita las preferencias usadas en conteos futuros. Esta ruta permite reparar una configuración local inválida.</p>
+          <form novalidate aria-label="Ajustes de moneda">
+            <fieldset>
+              <legend>Moneda 1</legend>
+              <div class="field">
+                <label for="currency-name">Nombre de la moneda</label>
+                <input id="currency-name" name="name" value="Dólar estadounidense" aria-label="Nombre de la moneda">
+              </div>
+              <div class="field">
+                <label for="currency-symbol">Símbolo</label>
+                <input id="currency-symbol" name="symbol" value="$" aria-label="Símbolo">
+              </div>
+              <div class="field">
+                <label for="currency-code">Código de moneda</label>
+                <input id="currency-code" name="code" value="USD" aria-label="Código de moneda">
+              </div>
+              <div class="field">
+                <label for="currency-denominations">Denominaciones (separadas por comas)</label>
+                <input id="currency-denominations" name="denominations" value="1, 5, 5, 10, 20" aria-invalid="true" aria-describedby="currency-denominations-error" aria-label="Denominaciones separadas por comas">
+                <p class="field-error" id="currency-denominations-error" role="alert">Las denominaciones deben ser únicas.</p>
+              </div>
+            </fieldset>
+            <div class="actions">
+              <button class="button" type="button">Agregar otra moneda</button>
+              <button class="button button--primary" type="submit">Guardar ajustes</button>
+            </div>
+            <p class="repair-note">Los cambios se aplican a conteos futuros; los conteos guardados conservan sus valores.</p>
+          </form>
+        </section>
+        <nav class="bottom-nav" aria-label="Navegación interna de CYNDY">
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⌗</span><span>Contar</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>Historial</span></button>
+          <button class="nav-item" type="button" aria-current="page"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ajustes</span></button>
+        </nav>
+      </article>
+    </section>
+
+    <section class="frame-wrap" aria-labelledby="confirmation-state">
+      <span class="state-label" id="confirmation-state">Light · English · Final reset confirmation</span>
+      <article class="module module--light" lang="en">
+        <a class="skip-link" href="#reset-dialog">Skip to confirmation</a>
+        <header class="module-header">
+          <a class="header-control" href="/" aria-label="Dashboard home"><span class="control-icon" aria-hidden="true">⌂</span></a>
+          <div class="identity"><div class="mark"><span class="mark-symbol" aria-hidden="true">C</span>CYNDY</div></div>
+          <button class="header-control header-control--theme" type="button" aria-label="Light theme active; change theme"><span class="control-icon" aria-hidden="true">☀</span></button>
+          <button class="header-control" type="button" aria-label="Selected language: English"><abbr title="English">EN</abbr></button>
+        </header>
+        <section class="confirmation-stage" aria-label="Dashboard behind confirmation">
+          <div class="dashboard-ghost" aria-hidden="true">
+            <div class="ghost-line ghost-line--short"></div>
+            <div class="ghost-card"></div>
+            <div class="ghost-line"></div>
+            <div class="ghost-card"></div>
+          </div>
+          <div class="dialog-scrim">
+            <!-- Native dialog representation of the existing second reset confirmation. -->
+            <dialog class="confirmation" id="reset-dialog" open role="alertdialog" aria-modal="true" aria-labelledby="reset-title" aria-describedby="reset-description">
+              <p class="danger-kicker">Local data</p>
+              <h1 id="reset-title">Final reset confirmation</h1>
+              <p id="reset-description">This cannot be undone. Confirm once more to reset this device.</p>
+              <div class="dialog-actions">
+                <button class="button" type="button" autofocus>Cancel reset</button>
+                <button class="button button--destructive" type="button">Confirm reset</button>
+              </div>
+            </dialog>
+          </div>
+        </section>
+        <nav class="bottom-nav" aria-label="CYNDY internal navigation">
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⌗</span><span>Count</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>History</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></button>
+        </nav>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

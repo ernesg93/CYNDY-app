@@ -21,6 +21,10 @@ const secondConfiguration: CurrencyConfiguration = {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.localStorage.removeItem("cyndy.locale");
+  window.localStorage.removeItem("cyndy.theme");
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.removeAttribute("lang");
   window.history.replaceState({}, "", "/");
 });
 
@@ -324,18 +328,65 @@ describe("application shell accessibility", () => {
     expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
   });
 
-  it("renders the compact module shell with an icon-only home control", async () => {
+  it("localizes Spanish validation feedback without saving local configuration", async () => {
     window.localStorage.setItem("cyndy.locale", "es");
-    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
-    await screen.findByRole("heading", { name: "Dashboard" });
+    window.history.replaceState({}, "", "/onboarding");
+    const store = routeRepository();
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Configura CYNDY" });
+    fireEvent.change(screen.getByLabelText("Denominaciones (separadas por comas)"), {
+      target: { value: "1.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
 
+    expect(await screen.findByText("Las denominaciones deben ser enteros positivos.")).toBeTruthy();
+    expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
+  });
+
+  it("localizes saved-settings status feedback in Spanish", async () => {
+    window.localStorage.setItem("cyndy.locale", "es");
+    window.history.replaceState({}, "", "/settings");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "Ajustes" });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar ajustes" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Ajustes guardados.");
+  });
+
+  it("applies the stored Spanish locale to route content and document language", async () => {
+    window.localStorage.setItem("cyndy.locale", "es");
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "Nuevo conteo" });
+
+    expect(document.documentElement.lang).toBe("es");
+    expect(screen.getByText("Nota (opcional)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Guardar conteo" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Inicio" }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("button", { name: "Cambiar tema" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cambiar idioma" })).toBeTruthy();
-    const navigation = screen.getByRole("navigation", { name: "Navegación de CYNDY" });
-    expect(within(navigation).getByRole("link", { name: "Contar" }).getAttribute("href")).toBe("/count/new");
-    expect(within(navigation).getByRole("link", { name: "Historial" }).getAttribute("href")).toBe("/history");
-    expect(within(navigation).getByRole("link", { name: "Ajustes" }).getAttribute("href")).toBe("/settings");
+  });
+
+  it.each([
+    ["/count/new", "Count"],
+    ["/history", "History"],
+    ["/settings", "Settings"],
+  ])("marks the active bottom-navigation destination on %s", async (path, name) => {
+    window.history.replaceState({}, "", path);
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+
+    const navigation = await screen.findByRole("navigation", { name: "CYNDY navigation" });
+    expect(within(navigation).getByRole("link", { name }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("applies the stored light theme to the header and bottom-navigation surfaces", async () => {
+    window.localStorage.setItem("cyndy.theme", "light");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+
+    await screen.findByRole("banner");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.querySelector(".app-header")).toBeTruthy();
+    expect(document.querySelector(".bottom-nav")).toBeTruthy();
   });
 
   it("puts an operable skip link first in keyboard order", async () => {

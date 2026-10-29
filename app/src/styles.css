@@ -260,6 +260,8 @@ button.secondary {
 :root[data-theme="dark"] .history-record-link, :root[data-theme="dark"] .history-empty-symbol { border-color:#43554f; }
 :root[data-theme="dark"] .history-record-link { color:#f3f7f4; }
 :root[data-theme="dark"] .history-record-link span, :root[data-theme="dark"] .history-empty-symbol { color:#8ce5ca; }
+:root[data-theme="dark"] .card > a:not(.button) { color:#8ce5ca; }
+:root[data-theme="dark"] .currency-total { color:#f3f7f4; background:#22312e; border-color:#43554f; }
 /* Settings repair and destructive-reset hierarchy. */
 .settings-page .eyebrow { margin-top:0; }
 .settings-page h1 { margin:0; }
@@ -302,6 +304,22 @@ button.secondary {
 :root[data-theme="dark"] .danger-kicker { color:#ffb4ab; }
 :root[data-theme="dark"] .error { color:#ffb4ab; }
 :root[data-theme="dark"] .status { color:#f3f7f4; background:#174a29; }
+@media (max-width: 24rem) {
+  .app-header {
+    grid-template-rows:44px 44px;
+    gap:4px;
+    padding:8px;
+  }
+  .brand {
+    position:static;
+    grid-column:1 / -1;
+    grid-row:1;
+    justify-self:center;
+    transform:none;
+  }
+  .home-control { grid-row:2; }
+  .header-actions { grid-row:2; gap:4px; }
+}
 @media print {
   .skip-link,
   .app-header,

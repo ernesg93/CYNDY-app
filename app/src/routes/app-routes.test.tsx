@@ -312,11 +312,14 @@ describe("configuration routes", () => {
 });
 
 describe("application shell accessibility", () => {
-  it("defines narrow Count-row reflow and readable dark-theme feedback", () => {
+  it("defines narrow Count-row and header reflow with readable dark-theme surfaces", () => {
     const styles = readFileSync("src/styles.css", "utf8");
 
     expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+12px\s+minmax\(0,\s*1fr\);[\s\S]*?grid-template-areas:\s*["']denomination multiply quantity["']\s*["']equals equals subtotal["'];[\s\S]*?\}/);
     expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-value\s*\{\s*grid-area:\s*denomination;\s*\}[\s\S]*?\.denomination-row input\s*\{\s*grid-area:\s*quantity;\s*\}[\s\S]*?\.row-operator:nth-of-type\(1\)\s*\{\s*grid-area:\s*multiply;\s*\}[\s\S]*?\.row-operator:nth-of-type\(2\)\s*\{\s*grid-area:\s*equals;\s*\}[\s\S]*?\.denomination-subtotal\s*\{\s*grid-area:\s*subtotal;\s*\}/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.app-header\s*\{[\s\S]*?grid-template-rows:\s*44px\s+44px;[\s\S]*?\.brand\s*\{[\s\S]*?position:\s*static;[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?\.home-control\s*\{[\s\S]*?grid-row:\s*2;[\s\S]*?\.header-actions\s*\{[\s\S]*?grid-row:\s*2;/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.currency-total\s*\{\s*color:\s*#f3f7f4;\s*background:\s*#22312e;/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.card\s*>\s*a:not\(\.button\)\s*\{\s*color:\s*#8ce5ca;\s*\}/);
     expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.error\s*\{\s*color:\s*#ffb4ab;\s*\}/);
     expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.status\s*\{\s*color:\s*#f3f7f4;\s*background:\s*#174a29;\s*\}/);
   });
@@ -375,6 +378,28 @@ describe("application shell accessibility", () => {
     expect(screen.getByRole("link", { name: "Inicio" }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("button", { name: "Cambiar tema" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cambiar idioma" })).toBeTruthy();
+  });
+
+  it("updates the offline-ready announcement when the selected locale changes", async () => {
+    const offlineReady = document.createElement("p");
+    offlineReady.id = "offline-ready";
+    offlineReady.hidden = true;
+    offlineReady.setAttribute("role", "status");
+    document.body.append(offlineReady);
+    try {
+      window.history.replaceState({}, "", "/count/new");
+      render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+      await screen.findByRole("heading", { name: "New count" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change language" }));
+
+      expect(offlineReady.lang).toBe("es");
+      expect(offlineReady.textContent).toBe(
+        "El acceso sin conexión está listo. Las funciones locales y los conteos guardados están disponibles sin conexión.",
+      );
+    } finally {
+      offlineReady.remove();
+    }
   });
 
   it.each([

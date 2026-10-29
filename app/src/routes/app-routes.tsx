@@ -844,7 +844,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     writeOptionalPreference("cyndy.theme", dark ? "dark" : "light");
   }, [dark]);
-  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
+  useEffect(() => {
+    document.documentElement.lang = locale;
+    const offlineReady = document.querySelector<HTMLElement>("#offline-ready");
+    if (!offlineReady) return;
+    offlineReady.lang = locale;
+    offlineReady.textContent = locale === "es"
+      ? "El acceso sin conexión está listo. Las funciones locales y los conteos guardados están disponibles sin conexión."
+      : "Offline access is ready. Local features and saved records are available without a connection.";
+  }, [locale]);
   const es = locale === "es";
   const words = es ? { home: "Inicio", count: "Contar", history: "Historial", settings: "Ajustes", nav: "Navegación de CYNDY", theme: "Cambiar tema", language: "Cambiar idioma" } : { home: "Home", count: "Count", history: "History", settings: "Settings", nav: "CYNDY navigation", theme: "Change theme", language: "Change language" };
   const activePath = window.location.pathname;

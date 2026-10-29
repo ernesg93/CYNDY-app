@@ -40,6 +40,14 @@ describe("offline shell registration", () => {
     );
   });
 
+  it("uses the active document language for the offline-ready announcement", () => {
+    const bootstrap = readText("../main.tsx");
+
+    expect(bootstrap).toContain('document.documentElement.lang === "es"');
+    expect(bootstrap).toContain("El acceso sin conexión está listo.");
+    expect(bootstrap).toContain("status.lang = locale");
+  });
+
   it("announces offline availability only after an active worker is ready", async () => {
     let activate!: () => void;
     const ready = new Promise<void>((resolve) => {

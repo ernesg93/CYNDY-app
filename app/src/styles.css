@@ -180,6 +180,20 @@ button.secondary {
     scroll-margin-block-start: 7rem;
   }
 }
+@media (max-width: 24rem) {
+  .denomination-row {
+    grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr);
+    grid-template-areas:
+      "denomination multiply quantity"
+      "equals equals subtotal";
+  }
+  .denomination-value { grid-area:denomination; }
+  .denomination-row input { grid-area:quantity; }
+  .row-operator:nth-of-type(1) { grid-area:multiply; }
+  .row-operator:nth-of-type(2) { grid-area:equals; }
+  .denomination-subtotal { grid-area:subtotal; }
+  .denomination-row .error { grid-column:1 / -1; }
+}
 .receipt-actions {
   display: flex;
   flex-wrap: wrap;
@@ -275,6 +289,7 @@ button.secondary {
 :root[data-theme="dark"] .confirmation { color:#f3f7f4; background:#182522; border-color:#43554f; }
 :root[data-theme="dark"] .dashboard-reset-button { color:#ffb4ab; border-color:#ffb4ab; }
 :root[data-theme="dark"] .danger-kicker { color:#ffb4ab; }
+:root[data-theme="dark"] .error { color:#ffb4ab; }
 @media print {
   .skip-link,
   .app-header,

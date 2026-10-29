@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -311,6 +312,14 @@ describe("configuration routes", () => {
 });
 
 describe("application shell accessibility", () => {
+  it("defines narrow Count-row reflow and readable dark-theme errors", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+
+    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+12px\s+minmax\(0,\s*1fr\);[\s\S]*?grid-template-areas:\s*["']denomination multiply quantity["']\s*["']equals equals subtotal["'];[\s\S]*?\}/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-value\s*\{\s*grid-area:\s*denomination;\s*\}[\s\S]*?\.denomination-row input\s*\{\s*grid-area:\s*quantity;\s*\}[\s\S]*?\.row-operator:nth-of-type\(1\)\s*\{\s*grid-area:\s*multiply;\s*\}[\s\S]*?\.row-operator:nth-of-type\(2\)\s*\{\s*grid-area:\s*equals;\s*\}[\s\S]*?\.denomination-subtotal\s*\{\s*grid-area:\s*subtotal;\s*\}/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.error\s*\{\s*color:\s*#ffb4ab;\s*\}/);
+  });
+
   it.each([
     ["onboarding", "/onboarding", []],
     ["dashboard", "/", [validConfiguration]],

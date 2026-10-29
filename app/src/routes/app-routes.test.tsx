@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +22,10 @@ const secondConfiguration: CurrencyConfiguration = {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.localStorage.removeItem("cyndy.locale");
+  window.localStorage.removeItem("cyndy.theme");
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.removeAttribute("lang");
   window.history.replaceState({}, "", "/");
 });
 
@@ -251,7 +256,7 @@ describe("configuration routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
     expect((await screen.findByRole("status")).textContent).toBe("Settings saved.");
 
-    fireEvent.click(screen.getByRole("link", { name: "New count" }));
+    fireEvent.click(screen.getByRole("link", { name: "Count" }));
     await screen.findByRole("heading", { name: "New count" });
     expect(screen.getByLabelText("$1 quantity")).toHaveProperty("value", "-1");
     expect(screen.getByLabelText("Note (optional)")).toHaveProperty("value", "Unsaved note");
@@ -307,6 +312,18 @@ describe("configuration routes", () => {
 });
 
 describe("application shell accessibility", () => {
+  it("defines narrow Count-row and header reflow with readable dark-theme surfaces", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+
+    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+12px\s+minmax\(0,\s*1fr\);[\s\S]*?grid-template-areas:\s*["']denomination multiply quantity["']\s*["']equals equals subtotal["'];[\s\S]*?\}/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-value\s*\{\s*grid-area:\s*denomination;\s*\}[\s\S]*?\.denomination-row input\s*\{\s*grid-area:\s*quantity;\s*\}[\s\S]*?\.row-operator:nth-of-type\(1\)\s*\{\s*grid-area:\s*multiply;\s*\}[\s\S]*?\.row-operator:nth-of-type\(2\)\s*\{\s*grid-area:\s*equals;\s*\}[\s\S]*?\.denomination-subtotal\s*\{\s*grid-area:\s*subtotal;\s*\}/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.app-header\s*\{[\s\S]*?grid-template-rows:\s*44px\s+44px;[\s\S]*?\.brand\s*\{[\s\S]*?position:\s*static;[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?\.home-control\s*\{[\s\S]*?grid-row:\s*2;[\s\S]*?\.header-actions\s*\{[\s\S]*?grid-row:\s*2;/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.currency-total\s*\{\s*color:\s*#f3f7f4;\s*background:\s*#22312e;/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.card\s*>\s*a:not\(\.button\)\s*\{\s*color:\s*#8ce5ca;\s*\}/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.error\s*\{\s*color:\s*#ffb4ab;\s*\}/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.status\s*\{\s*color:\s*#f3f7f4;\s*background:\s*#174a29;\s*\}/);
+  });
+
   it.each([
     ["onboarding", "/onboarding", []],
     ["dashboard", "/", [validConfiguration]],
@@ -317,11 +334,115 @@ describe("application shell accessibility", () => {
 
     await screen.findByRole("main");
     expect(screen.getByRole("banner")).toBeTruthy();
-    expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
+    expect(screen.getByRole("navigation", { name: "CYNDY navigation" })).toBeTruthy();
     expect(screen.getByRole("main").id).toBe("main-content");
     expect(screen.getByRole("link", { name: "CYNDY home" }).getAttribute("href")).toBe("/");
-    expect(screen.getByRole("link", { name: "New count" }).getAttribute("href")).toBe("/count/new");
+    expect(screen.getByRole("link", { name: "Count" }).getAttribute("href")).toBe("/count/new");
     expect(screen.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+  });
+
+  it("localizes Spanish validation feedback without saving local configuration", async () => {
+    window.localStorage.setItem("cyndy.locale", "es");
+    window.history.replaceState({}, "", "/onboarding");
+    const store = routeRepository();
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "Configura CYNDY" });
+    fireEvent.change(screen.getByLabelText("Denominaciones (separadas por comas)"), {
+      target: { value: "1.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
+
+    expect(await screen.findByText("Las denominaciones deben ser enteros positivos.")).toBeTruthy();
+    expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
+  });
+
+  it("localizes saved-settings status feedback in Spanish", async () => {
+    window.localStorage.setItem("cyndy.locale", "es");
+    window.history.replaceState({}, "", "/settings");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "Ajustes" });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar ajustes" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Ajustes guardados.");
+  });
+
+  it("applies the stored Spanish locale to route content and document language", async () => {
+    window.localStorage.setItem("cyndy.locale", "es");
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "Nuevo conteo" });
+
+    expect(document.documentElement.lang).toBe("es");
+    expect(screen.getByText("Nota (opcional)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Guardar conteo" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Inicio" }).getAttribute("href")).toBe("/");
+    expect(screen.getByRole("button", { name: "Cambiar tema" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Cambiar idioma" })).toBeTruthy();
+  });
+
+  it("updates the offline-ready announcement when the selected locale changes", async () => {
+    const offlineReady = document.createElement("p");
+    offlineReady.id = "offline-ready";
+    offlineReady.hidden = true;
+    offlineReady.setAttribute("role", "status");
+    document.body.append(offlineReady);
+    try {
+      window.history.replaceState({}, "", "/count/new");
+      render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+      await screen.findByRole("heading", { name: "New count" });
+
+      fireEvent.click(screen.getByRole("button", { name: "Change language" }));
+
+      expect(offlineReady.lang).toBe("es");
+      expect(offlineReady.textContent).toBe(
+        "El acceso sin conexión está listo. Las funciones locales y los conteos guardados están disponibles sin conexión.",
+      );
+    } finally {
+      offlineReady.remove();
+    }
+  });
+
+  it.each([
+    ["/count/new", "Count"],
+    ["/history", "History"],
+    ["/settings", "Settings"],
+  ])("marks the active bottom-navigation destination on %s", async (path, name) => {
+    window.history.replaceState({}, "", path);
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+
+    const navigation = await screen.findByRole("navigation", { name: "CYNDY navigation" });
+    expect(within(navigation).getByRole("link", { name }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("applies the stored light theme to the header and bottom-navigation surfaces", async () => {
+    window.localStorage.setItem("cyndy.theme", "light");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+
+    await screen.findByRole("banner");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.querySelector(".app-header")).toBeTruthy();
+    expect(document.querySelector(".bottom-nav")).toBeTruthy();
+  });
+
+  it("renders local routes and updates preferences when localStorage is unavailable", async () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+    window.history.replaceState({}, "", "/count/new");
+
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.click(screen.getByRole("button", { name: "Change theme" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change language" }));
+
+    expect(await screen.findByRole("heading", { name: "Nuevo conteo" })).toBeTruthy();
+    expect(getItem).toHaveBeenCalledWith("cyndy.locale");
+    expect(getItem).toHaveBeenCalledWith("cyndy.theme");
+    expect(setItem).toHaveBeenCalledWith("cyndy.theme", "light");
+    expect(setItem).toHaveBeenCalledWith("cyndy.locale", "es");
   });
 
   it("puts an operable skip link first in keyboard order", async () => {
@@ -352,6 +473,25 @@ describe("application shell accessibility", () => {
 });
 
 describe("new count route", () => {
+  it("describes each quantity subtotal with its value and currency while keeping the visible subtotal numeric-only", async () => {
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "New count" });
+
+    const quantity = screen.getByLabelText("$1 quantity");
+    const description = document.getElementById("usd:1-subtotal-description");
+    const visibleSubtotal = document.getElementById("usd:1-subtotal");
+
+    expect(quantity.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description");
+    expect(description?.textContent).toBe("Subtotal: $0 USD");
+    expect(visibleSubtotal?.textContent).toBe("0");
+    expect(visibleSubtotal?.getAttribute("aria-label")).toBeNull();
+
+    fireEvent.change(quantity, { target: { value: "3" } });
+    expect(description?.textContent).toBe("Subtotal: $3 USD");
+    expect(visibleSubtotal?.textContent).toBe("3");
+  });
+
   it("renders passive fieldset-scoped totals that update independently", async () => {
     const store = routeRepository([validConfiguration, secondConfiguration]);
     window.history.replaceState({}, "", "/count/new");
@@ -384,7 +524,7 @@ describe("new count route", () => {
     }
     expect(within(dollars).queryByRole("status")).toBeNull();
     expect(within(dollars).queryByRole("alert")).toBeNull();
-    expect(screen.getByLabelText("$5 quantity").getAttribute("aria-describedby")).toBe("usd:5-subtotal");
+    expect(screen.getByLabelText("$5 quantity").getAttribute("aria-describedby")).toBe("usd:5-subtotal-description");
   });
 
   it("saves two independent currency snapshots with an automatic timestamp and note", async () => {
@@ -407,12 +547,12 @@ describe("new count route", () => {
 
     const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
     const euros = screen.getByRole("group", { name: "Euro (EUR)" });
-    expect(within(dollars).getByText("$1 ×")).toBeTruthy();
-    expect(within(dollars).getByText("= $3")).toBeTruthy();
-    expect(within(dollars).getByText("= $10")).toBeTruthy();
+    expect(within(dollars).getByText("1")).toBeTruthy();
+    expect(within(dollars).getByText("3")).toBeTruthy();
+    expect(within(dollars).getByText("10")).toBeTruthy();
     expect(within(dollars).getByText("$13 USD")).toBeTruthy();
-    expect(within(euros).getByText("= €8")).toBeTruthy();
-    expect(within(euros).getByText("= €5")).toBeTruthy();
+    expect(within(euros).getByText("8")).toBeTruthy();
+    expect(document.getElementById("eur:5-subtotal")?.textContent).toBe("5");
     expect(within(euros).getByText("€13 EUR")).toBeTruthy();
     expect(within(dollars).queryByRole("status")).toBeNull();
     const quantity = screen.getByLabelText("$1 quantity");
@@ -462,7 +602,7 @@ describe("new count route", () => {
       "Quantities must be non-negative integers.",
     );
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(input.getAttribute("aria-describedby")).toContain("usd:1-error");
+    expect(input.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description usd:1-error");
     expect(store.saveCount).not.toHaveBeenCalled();
   });
 
@@ -481,7 +621,7 @@ describe("new count route", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(invalidQuantity.getAttribute("aria-invalid")).toBe("true");
     expect(secondInvalidQuantity.getAttribute("aria-invalid")).toBe("true");
-    expect(invalidQuantity.getAttribute("aria-describedby")).toContain("usd:1-error");
+    expect(invalidQuantity.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description usd:1-error");
     expect(screen.getAllByText("Enter a non-negative whole number within the safe integer range.")).toHaveLength(2);
 
     const clear = screen.getByRole("button", { name: "Clear unsaved count" });
@@ -493,7 +633,7 @@ describe("new count route", () => {
     expect(invalidQuantity.getAttribute("aria-invalid")).toBeNull();
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getAllByText(/= [$€]0/)).toHaveLength(4);
+    expect(document.querySelectorAll(".visually-hidden[id$='-subtotal-description']")).toHaveLength(4);
     expect(screen.getByText("$0 USD")).toBeTruthy();
     expect(screen.getByText("€0 EUR")).toBeTruthy();
     expect(document.activeElement).toBe(clear);

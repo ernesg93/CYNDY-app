@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CYNDY Dashboard workflow — design prototype</title>
+  <!-- Static, non-production visual prototype. It represents only existing local Dashboard facts. -->
+  <style>
+    :root { --frame: 360px; --tap: 44px; --r-card: 18px; --r-control: 12px; --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; margin: 0; background: #d9dedc; color: #17211f; font-family: var(--font); }
+    button, a { font: inherit; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    .review-note { max-width: 760px; margin: 20px auto 12px; padding: 0 var(--s4); color: #263330; font-size: .875rem; line-height: 1.45; text-align: center; }
+    .states { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 28px; padding: 0 12px 28px; }
+    .frame-wrap { width: var(--frame); }
+    .state-label { display: block; margin-bottom: var(--s2); color: #263330; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
+    .module { --canvas:#101917; --surface:#182522; --input:#22312e; --text:#f3f7f4; --muted:#b0c0ba; --border:#43554f; --focus:#8ce5ca; --primary:#8ce5ca; --on-primary:#07221a; --nav-active:#17453a; display:grid; grid-template-rows:auto minmax(0,1fr) auto; height:760px; overflow:hidden; border:1px solid var(--border); border-radius:28px; background:var(--canvas); box-shadow:0 14px 34px rgb(20 32 29 / .22); color:var(--text); }
+    .module--light { --canvas:#f7faf7; --surface:#fff; --input:#edf4f0; --text:#17211f; --muted:#52625d; --border:#bdcec6; --focus:#006e58; --primary:#006e58; --on-primary:#fff; --nav-active:#d9f4e8; }
+    .skip-link { position:absolute; top:0; left:0; z-index:3; transform:translateY(-200%); margin:var(--s2); padding:var(--s2) var(--s3); border-radius:var(--r-control); background:var(--primary); color:var(--on-primary); font-weight:800; }
+    .skip-link:focus { transform:translateY(0); }
+    .module-header { position:relative; display:grid; grid-template-columns:var(--tap) minmax(0,1fr) var(--tap) var(--tap); gap:var(--s2); align-items:center; padding:var(--s3) var(--s4); border-bottom:1px solid var(--border); background:var(--surface); }
+    .icon-control { display:grid; width:var(--tap); min-width:var(--tap); height:var(--tap); place-items:center; padding:0; border:1px solid var(--border); border-radius:var(--r-control); background:var(--input); color:var(--text); cursor:pointer; }
+    .module-header > button.icon-control--theme { grid-column:3; }
+    .module-header > button.language { grid-column:4; }
+    .icon-control--theme { border-color:var(--primary); color:var(--primary); }
+    .icon { font-size:1.1rem; line-height:1; }
+    .language { font-size:.75rem; font-weight:850; }
+    .brand { position:absolute; left:50%; transform:translateX(-50%); min-width:max-content; display:flex; align-items:center; gap:var(--s2); font-size:.95rem; font-weight:850; letter-spacing:.07em; }
+    .brand-mark { display:grid; place-items:center; width:28px; height:28px; flex:0 0 auto; border-radius:50%; background:var(--primary); color:var(--on-primary); font-size:.8rem; letter-spacing:0; }
+    .dashboard-content { min-height:0; overflow:auto; overscroll-behavior:contain; padding:var(--s4) var(--s4) var(--s5); }
+    .eyebrow { margin:0 0 var(--s1); color:var(--primary); font-size:.75rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { margin:0; font-size:1.45rem; line-height:1.18; }
+    .intro { margin:var(--s1) 0 var(--s4); color:var(--muted); font-size:.875rem; line-height:1.42; }
+    .start-action { display:flex; align-items:center; justify-content:center; gap:var(--s2); min-height:var(--tap); margin-bottom:var(--s4); padding:0 var(--s4); border:1px solid var(--primary); border-radius:var(--r-control); background:var(--primary); color:var(--on-primary); font-size:.9rem; font-weight:850; text-decoration:none; }
+    .section-heading { margin:0 0 var(--s2); font-size:1rem; line-height:1.25; }
+    .latest-card, .statistics-card { padding:var(--s3); border:1px solid var(--border); border-radius:var(--r-card); background:var(--surface); }
+    .latest-card { display:grid; gap:var(--s3); }
+    .latest-card time { color:var(--muted); font-size:.78rem; font-variant-numeric:tabular-nums; font-weight:700; }
+    .currency-totals, .record-counts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--s2); margin:0; }
+    .currency-totals > div, .record-counts > div { min-width:0; padding:var(--s2); border-radius:var(--r-control); background:var(--input); }
+    dt { color:var(--muted); font-size:.72rem; font-weight:850; letter-spacing:.04em; }
+    dd { margin:2px 0 0; color:var(--text); font-size:.95rem; font-variant-numeric:tabular-nums; font-weight:850; white-space:nowrap; }
+    .secondary-link { display:inline-flex; min-height:var(--tap); align-items:center; justify-content:center; gap:var(--s2); padding:0 var(--s3); border:1px solid var(--border); border-radius:var(--r-control); color:var(--text); font-size:.875rem; font-weight:800; text-decoration:none; }
+    .statistics { margin-top:var(--s4); }
+    .statistics-card { display:grid; gap:var(--s3); }
+    .record-total { margin:0; color:var(--muted); font-size:.875rem; }
+    .record-total strong { color:var(--text); font-size:1.15rem; font-variant-numeric:tabular-nums; }
+    .settings-link { margin-top:var(--s3); }
+    .bottom-nav { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s1); padding:var(--s2) var(--s2) max(var(--s2),env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:var(--surface); }
+    .nav-item { display:grid; min-height:var(--tap); place-content:center; gap:2px; padding:4px; border:0; border-radius:var(--r-control); background:transparent; color:var(--muted); cursor:pointer; font-size:.75rem; font-weight:800; }
+    .nav-icon { font-size:1rem; line-height:1; text-align:center; }
+    .nav-item[aria-current="page"] { background:var(--nav-active); color:var(--text); }
+    .nav-item[aria-current="page"] .nav-icon { color:var(--primary); }
+    @media (max-width:399px) { body { min-width:0; } .review-note { text-align:left; } .states { padding-right:0; padding-left:0; } .frame-wrap { width:100%; } .module { width:100%; border-right:0; border-left:0; border-radius:0; } }
+    @media (prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
+    @media (forced-colors:active) { .module, .icon-control, .latest-card, .statistics-card, .secondary-link, .bottom-nav { border-color:CanvasText; } .nav-item[aria-current="page"] { outline:2px solid CanvasText; } }
+  </style>
+</head>
+<body>
+  <p class="review-note"><strong>Design-only static Dashboard prototype.</strong> Two 360 px Android-first states for the existing local Dashboard facts. Currency amounts remain separate; no conversion, trends, charts, cloud, export, search, print, or host navigation is shown.</p>
+  <div class="states" aria-label="CYNDY Dashboard workflow states">
+    <section class="frame-wrap" aria-labelledby="dark-es-label">
+      <span class="state-label" id="dark-es-label">Primary · oscuro · español · 360 px</span>
+      <article class="module" lang="es">
+        <a class="skip-link" href="#dashboard-es">Saltar al panel</a>
+        <header class="module-header">
+          <a class="icon-control" href="/" aria-label="Panel de inicio"><span class="icon" aria-hidden="true">⌂</span></a>
+          <div class="brand"><span class="brand-mark" aria-hidden="true">C</span>CYNDY</div>
+          <button class="icon-control icon-control--theme" type="button" aria-label="Tema oscuro activo; cambiar tema"><span class="icon" aria-hidden="true">☾</span></button>
+          <button class="icon-control language" type="button" aria-label="Idioma seleccionado: español">ES</button>
+        </header>
+        <main class="dashboard-content" id="dashboard-es" tabindex="-1">
+          <p class="eyebrow">Panel local</p><h1>Bienvenida</h1>
+          <p class="intro">Consulta el último registro y tus conteos guardados en este dispositivo.</p>
+          <a class="start-action" href="/count/new">Iniciar conteo <span aria-hidden="true">→</span></a>
+          <section aria-labelledby="latest-es"><h2 class="section-heading" id="latest-es">Último conteo guardado</h2>
+            <article class="latest-card"><time datetime="2026-10-12T12:00:00.000Z">12 oct 2026 · 12:00</time>
+              <dl class="currency-totals" aria-label="Totales separados por moneda"><div><dt>MXN</dt><dd>$2,370 MXN</dd></div><div><dt>USD</dt><dd>US$48 USD</dd></div></dl>
+              <a class="secondary-link" href="/history/saved-count-latest">Ver último conteo <span aria-hidden="true">→</span></a>
+            </article>
+          </section>
+          <section class="statistics" aria-labelledby="stats-es"><h2 class="section-heading" id="stats-es">Estadísticas locales</h2>
+            <article class="statistics-card"><p class="record-total"><strong>12</strong> conteos guardados</p>
+              <dl class="record-counts" aria-label="Conteos guardados por moneda"><div><dt>MXN</dt><dd>12 registros</dd></div><div><dt>USD</dt><dd>7 registros</dd></div></dl>
+              <a class="secondary-link settings-link" href="/settings">Abrir ajustes <span aria-hidden="true">→</span></a>
+            </article>
+          </section>
+        </main>
+        <nav class="bottom-nav" aria-label="Navegación interna de CYNDY"><button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⌗</span><span>Contar</span></button><button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>Historial</span></button><button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ajustes</span></button></nav>
+      </article>
+    </section>
+    <section class="frame-wrap" aria-labelledby="light-en-label">
+      <span class="state-label" id="light-en-label">Parity · light · English · 360 px</span>
+      <article class="module module--light" lang="en">
+        <a class="skip-link" href="#dashboard-en">Skip to dashboard</a>
+        <header class="module-header">
+          <a class="icon-control" href="/" aria-label="Dashboard home"><span class="icon" aria-hidden="true">⌂</span></a>
+          <div class="brand"><span class="brand-mark" aria-hidden="true">C</span>CYNDY</div>
+          <button class="icon-control icon-control--theme" type="button" aria-label="Light theme active; change theme"><span class="icon" aria-hidden="true">☀</span></button>
+          <button class="icon-control language" type="button" aria-label="Selected language: English">EN</button>
+        </header>
+        <main class="dashboard-content" id="dashboard-en" tabindex="-1">
+          <p class="eyebrow">Local dashboard</p><h1>Welcome</h1>
+          <p class="intro">Review the latest record and saved counts on this device.</p>
+          <a class="start-action" href="/count/new">Start a count <span aria-hidden="true">→</span></a>
+          <section aria-labelledby="latest-en"><h2 class="section-heading" id="latest-en">Latest saved count</h2>
+            <article class="latest-card"><time datetime="2026-10-12T12:00:00.000Z">Oct 12, 2026 · 12:00</time>
+              <dl class="currency-totals" aria-label="Separate currency totals"><div><dt>MXN</dt><dd>$2,370 MXN</dd></div><div><dt>USD</dt><dd>US$48 USD</dd></div></dl>
+              <a class="secondary-link" href="/history/saved-count-latest">View latest count <span aria-hidden="true">→</span></a>
+            </article>
+          </section>
+          <section class="statistics" aria-labelledby="stats-en"><h2 class="section-heading" id="stats-en">Local statistics</h2>
+            <article class="statistics-card"><p class="record-total"><strong>12</strong> saved counts</p>
+              <dl class="record-counts" aria-label="Saved count records by currency"><div><dt>MXN</dt><dd>12 records</dd></div><div><dt>USD</dt><dd>7 records</dd></div></dl>
+              <a class="secondary-link settings-link" href="/settings">Open settings <span aria-hidden="true">→</span></a>
+            </article>
+          </section>
+        </main>
+        <nav class="bottom-nav" aria-label="CYNDY internal navigation"><button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⌗</span><span>Count</span></button><button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>History</span></button><button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></button></nav>
+      </article>
+    </section>
+  </div>
+</body>
+</html>

@@ -12,7 +12,13 @@ if (!root) {
 const serviceWorker = "serviceWorker" in navigator ? navigator.serviceWorker : undefined;
 void registerOfflineShell(serviceWorker, () => {
   const status = document.querySelector<HTMLElement>("#offline-ready");
-  if (status) status.hidden = false;
+  if (!status) return;
+  const locale = document.documentElement.lang === "es" ? "es" : "en";
+  status.lang = locale;
+  status.textContent = locale === "es"
+    ? "El acceso sin conexión está listo. Las funciones locales y los conteos guardados están disponibles sin conexión."
+    : "Offline access is ready. Local features and saved records are available without a connection.";
+  status.hidden = false;
 });
 
 createRoot(root).render(<App />);

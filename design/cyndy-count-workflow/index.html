@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CYNDY Count workflow — design prototype</title>
+  <!--
+    NON-PRODUCTION PROTOTYPE INPUT FOR OPENPENCIL.
+    This static HTML/CSS source demonstrates the Count route only. It is not
+    application code, does not persist data, and does not represent a parent host.
+  -->
+  <style>
+    :root {
+      --frame-width: 360px;
+      --control-size: 44px;
+      --radius-card: 18px;
+      --radius-control: 12px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: #d9dedc; }
+    body {
+      min-width: 320px;
+      margin: 0;
+      color: #17211f;
+      font-family: var(--font-ui);
+    }
+    button, input { font: inherit; }
+    button, input, a { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible, a:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .prototype-note {
+      max-width: 760px;
+      margin: 20px auto 12px;
+      padding: 0 var(--space-4);
+      color: #263330;
+      font-size: .875rem;
+      line-height: 1.45;
+      text-align: center;
+    }
+    .states {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 28px;
+      padding: 0 12px 28px;
+    }
+    .frame-wrap { width: var(--frame-width); }
+    .state-label {
+      display: block;
+      margin-bottom: var(--space-2);
+      color: #263330;
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    /* Semantic tokens are shared by both theme states. */
+    .module {
+      --canvas: #101917;
+      --surface: #182522;
+      --input: #22312e;
+      --text: #f3f7f4;
+      --muted: #b0c0ba;
+      --border: #43554f;
+      --focus: #8ce5ca;
+      --primary: #8ce5ca;
+      --on-primary: #07221a;
+      --destructive: #ffb4aa;
+      --success: #a3eabf;
+      --disabled: #7a8984;
+      --nav-active: #17453a;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      height: 780px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      background: var(--canvas);
+      box-shadow: 0 14px 34px rgb(20 32 29 / .22);
+      color: var(--text);
+    }
+    .module--light {
+      --canvas: #f7faf7;
+      --surface: #ffffff;
+      --input: #edf4f0;
+      --text: #17211f;
+      --muted: #52625d;
+      --border: #bdcec6;
+      --focus: #006e58;
+      --primary: #006e58;
+      --on-primary: #ffffff;
+      --destructive: #ba1a1a;
+      --success: #176e3d;
+      --disabled: #91a09a;
+      --nav-active: #d9f4e8;
+      height: 580px;
+    }
+
+    .skip-link {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 3;
+      transform: translateY(-200%);
+      margin: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-control);
+      background: var(--primary);
+      color: var(--on-primary);
+      font-weight: 800;
+    }
+    .skip-link:focus { transform: translateY(0); }
+    .module-header {
+      position: relative;
+      display: grid;
+      grid-template-columns: var(--control-size) 1fr var(--control-size) var(--control-size);
+      gap: var(--space-2);
+      align-items: center;
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .identity { position: absolute; left: 50%; transform: translateX(-50%); min-width: max-content; }
+    .brand { display: flex; align-items: center; gap: var(--space-2); font-size: .95rem; font-weight: 850; letter-spacing: .07em; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: var(--on-primary);
+      font-size: .8rem;
+      letter-spacing: 0;
+    }
+    .route-context { margin: 2px 0 0 36px; color: var(--muted); font-size: .75rem; font-weight: 650; }
+    .header-control {
+      display: inline-grid;
+      place-items: center;
+      width: var(--control-size);
+      min-width: var(--control-size);
+      height: var(--control-size);
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-control);
+      background: var(--input);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .module-header > button.header-control--theme { grid-column: 3; }
+    .module-header > button.header-control:not(.header-control--theme) { grid-column: 4; }
+    .header-control--theme { border-color: var(--primary); color: var(--primary); }
+    .header-icon { font-size: 1.1rem; line-height: 1; }
+    .header-control abbr { border: 0; color: inherit; font-size: .75rem; font-weight: 850; text-decoration: none; }
+
+    .count-content {
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: var(--space-4) var(--space-4) var(--space-5);
+    }
+    .eyebrow { margin: 0 0 var(--space-1); color: var(--primary); font-size: .75rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 1.38rem; line-height: 1.2; }
+    .intro { margin: var(--space-1) 0 var(--space-4); color: var(--muted); font-size: .875rem; line-height: 1.4; }
+    form { display: grid; gap: var(--space-4); }
+    fieldset {
+      min-width: 0;
+      margin: 0;
+      padding: var(--space-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      background: var(--surface);
+    }
+    legend { padding: 0 var(--space-1); color: var(--text); font-size: .95rem; font-weight: 850; }
+    .currency-code { color: var(--muted); font-weight: 700; }
+    /* Passive total remains inside this currency fieldset while denomination rows scroll. */
+    .currency-total {
+      position: sticky;
+      top: -1px;
+      z-index: 1;
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin: var(--space-2) 0 var(--space-3);
+      padding: 10px var(--space-2);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: .8rem;
+    }
+    .currency-total strong { color: var(--text); font-size: 1rem; white-space: nowrap; }
+    .denomination-list { display: grid; gap: var(--space-1); }
+    /* Fixed grammar columns keep every partial count stable as values gain digits. */
+    .denomination-row {
+      display: grid;
+      grid-template-columns: 72px 12px 76px 12px minmax(0, 1fr);
+      gap: var(--space-1);
+      align-items: center;
+      min-width: 0;
+    }
+    .denomination, input[type="number"], .subtotal {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-width: 0;
+      min-height: var(--control-size);
+      padding: 0 var(--space-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-control);
+      background: var(--input);
+    }
+    .denomination {
+      justify-content: flex-end;
+      color: var(--text);
+      font-size: .9rem;
+      font-variant-numeric: tabular-nums;
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .row-operator {
+      display: grid;
+      place-items: center;
+      width: 12px;
+      color: var(--muted);
+      font-weight: 850;
+    }
+    input[type="number"] {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 750;
+      text-align: right;
+    }
+    .subtotal {
+      justify-content: flex-end;
+      color: var(--muted);
+      font-size: .8rem;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .subtotal strong { color: var(--text); font-size: .9rem; }
+    .field { display: grid; gap: var(--space-2); }
+    .field label { font-size: .875rem; font-weight: 800; }
+    .field input { min-height: var(--control-size); }
+    .field input[type="text"] { border-radius: 22px; }
+    /* One horizontal action row preserves 44px targets without crowding bottom navigation. */
+    .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+    .save-action, .clear-action {
+      min-height: var(--control-size);
+      padding: 0 var(--space-3);
+      border-radius: var(--radius-control);
+      cursor: pointer;
+      font-weight: 850;
+    }
+    .save-action { border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); }
+    .clear-action { border: 1px solid var(--destructive); background: transparent; color: var(--destructive); }
+
+    .bottom-nav {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-1);
+      padding: var(--space-2) var(--space-2) max(var(--space-2), env(safe-area-inset-bottom));
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .nav-item {
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 2px;
+      min-height: var(--control-size);
+      padding: 4px;
+      border: 0;
+      border-radius: var(--radius-control);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .75rem;
+      font-weight: 800;
+    }
+    .nav-icon { font-size: 1rem; line-height: 1; }
+    .nav-item[aria-current="page"] { background: var(--nav-active); color: var(--text); }
+    .nav-item[aria-current="page"] .nav-icon { color: var(--primary); }
+
+    .module--light .count-content { padding-top: var(--space-3); }
+    .module--light .intro { margin-bottom: var(--space-3); }
+    .module--light fieldset { padding: var(--space-2) var(--space-3); }
+    .module--light .currency-total { margin-bottom: var(--space-2); }
+    .module--light .denomination-list { gap: var(--space-1); }
+    .module--light .denomination-row:last-child { display: none; }
+
+    @media (max-width: 399px) {
+      body { min-width: 0; }
+      .prototype-note { text-align: left; }
+      .states { padding-right: 0; padding-left: 0; }
+      .frame-wrap { width: 100%; }
+      .module { width: 100%; border-right: 0; border-left: 0; border-radius: 0; }
+    }
+    @media (forced-colors: active) {
+      .module, fieldset, .header-control, input, .bottom-nav { border-color: CanvasText; }
+      .nav-item[aria-current="page"] { outline: 2px solid CanvasText; }
+    }
+  </style>
+</head>
+<body>
+  <p class="prototype-note"><strong>Design-only static Count prototype.</strong> A self-contained Android-first CYNDY module for review and OpenPencil import; controls and values are illustrative and non-functional.</p>
+
+  <main class="states" aria-label="CYNDY Count workflow states">
+    <section class="frame-wrap" aria-labelledby="dark-es-label">
+      <span class="state-label" id="dark-es-label">Primary · oscuro · español · 360 px</span>
+      <article class="module" lang="es">
+        <a class="skip-link" href="#count-es">Saltar al conteo</a>
+        <header class="module-header">
+          <a class="header-control" href="/" aria-label="Panel de inicio"><span class="header-icon" aria-hidden="true">⌂</span></a>
+          <div class="identity"><div class="brand"><span class="brand-mark" aria-hidden="true">C</span>CYNDY</div></div>
+          <button class="header-control header-control--theme" type="button" aria-label="Tema oscuro activo; cambiar tema"><span class="header-icon" aria-hidden="true">☾</span></button>
+          <button class="header-control" type="button" aria-label="Idioma seleccionado: español"><abbr title="Español">ES</abbr></button>
+        </header>
+
+        <main class="count-content" id="count-es" tabindex="-1">
+          <p class="eyebrow">Contar efectivo</p>
+          <h1>Nuevo conteo</h1>
+          <p class="intro">Registra las unidades por denominación. Los importes permanecen separados por moneda.</p>
+          <form>
+            <fieldset>
+              <legend>Peso mexicano <span class="currency-code">(MXN)</span></legend>
+              <p class="currency-total"><span>Total MXN</span><strong>$2,370 MXN</strong></p>
+              <div class="denomination-list">
+                <div class="denomination-row">
+                  <data class="denomination" value="500">500</data><span class="row-operator" aria-hidden="true">×</span>
+                  <input id="mxn-500" type="number" min="0" step="1" inputmode="numeric" value="3" aria-label="Cantidad de 500 pesos mexicanos">
+                  <span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="mxn-500" aria-label="Subtotal: 1,500 pesos mexicanos"><strong>1,500</strong></output>
+                </div>
+                <div class="denomination-row">
+                  <data class="denomination" value="200">200</data><span class="row-operator" aria-hidden="true">×</span>
+                  <input id="mxn-200" type="number" min="0" step="1" inputmode="numeric" value="2" aria-label="Cantidad de 200 pesos mexicanos">
+                  <span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="mxn-200" aria-label="Subtotal: 400 pesos mexicanos"><strong>400</strong></output>
+                </div>
+                <div class="denomination-row">
+                  <data class="denomination" value="100">100</data><span class="row-operator" aria-hidden="true">×</span>
+                  <input id="mxn-100" type="number" min="0" step="1" inputmode="numeric" value="4" aria-label="Cantidad de 100 pesos mexicanos">
+                  <span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="mxn-100" aria-label="Subtotal: 400 pesos mexicanos"><strong>400</strong></output>
+                </div>
+                <div class="denomination-row">
+                  <data class="denomination" value="50">50</data><span class="row-operator" aria-hidden="true">×</span>
+                  <input id="mxn-50" type="number" min="0" step="1" inputmode="numeric" value="1" aria-label="Cantidad de 50 pesos mexicanos">
+                  <span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="mxn-50" aria-label="Subtotal: 50 pesos mexicanos"><strong>50</strong></output>
+                </div>
+                <div class="denomination-row">
+                  <data class="denomination" value="20">20</data><span class="row-operator" aria-hidden="true">×</span>
+                  <input id="mxn-20" type="number" min="0" step="1" inputmode="numeric" value="1" aria-label="Cantidad de 20 pesos mexicanos">
+                  <span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="mxn-20" aria-label="Subtotal: 20 pesos mexicanos"><strong>20</strong></output>
+                </div>
+              </div>
+            </fieldset>
+            <div class="field">
+              <label for="note-es">Nota <span class="currency-code">(opcional)</span></label>
+              <input id="note-es" type="text" value="Caja de apertura" aria-label="Nota opcional">
+            </div>
+            <div class="actions">
+              <button class="save-action" type="submit">Guardar</button>
+              <button class="clear-action" type="button" aria-label="Limpiar conteo sin guardar">Limpiar</button>
+            </div>
+          </form>
+        </main>
+
+        <nav class="bottom-nav" aria-label="Navegación interna de CYNDY">
+          <button class="nav-item" type="button" aria-current="page"><span class="nav-icon" aria-hidden="true">⌗</span><span>Contar</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>Historial</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span>Ajustes</span></button>
+        </nav>
+      </article>
+    </section>
+
+    <section class="frame-wrap" aria-labelledby="light-en-label">
+      <span class="state-label" id="light-en-label">Parity state · light · English</span>
+      <article class="module module--light" lang="en">
+        <a class="skip-link" href="#count-en">Skip to count</a>
+        <header class="module-header">
+          <a class="header-control" href="/" aria-label="Dashboard home"><span class="header-icon" aria-hidden="true">⌂</span></a>
+          <div class="identity"><div class="brand"><span class="brand-mark" aria-hidden="true">C</span>CYNDY</div></div>
+          <button class="header-control header-control--theme" type="button" aria-label="Light theme active; change theme"><span class="header-icon" aria-hidden="true">☀</span></button>
+          <button class="header-control" type="button" aria-label="Selected language: English"><abbr title="English">EN</abbr></button>
+        </header>
+        <main class="count-content" id="count-en" tabindex="-1">
+          <p class="eyebrow">Count cash</p>
+          <h1>New count</h1>
+          <p class="intro">A compact locale and theme parity view.</p>
+          <form>
+            <fieldset>
+              <legend>Mexican peso <span class="currency-code">(MXN)</span></legend>
+              <p class="currency-total"><span>MXN total</span><strong>$2,370 MXN</strong></p>
+              <div class="denomination-list">
+                <div class="denomination-row"><data class="denomination" value="500">500</data><span class="row-operator" aria-hidden="true">×</span><input id="en-500" type="number" min="0" step="1" inputmode="numeric" value="3" aria-label="Quantity of 500 Mexican pesos"><span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="en-500" aria-label="Subtotal: 1,500 Mexican pesos"><strong>1,500</strong></output></div>
+                <div class="denomination-row"><data class="denomination" value="200">200</data><span class="row-operator" aria-hidden="true">×</span><input id="en-200" type="number" min="0" step="1" inputmode="numeric" value="2" aria-label="Quantity of 200 Mexican pesos"><span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="en-200" aria-label="Subtotal: 400 Mexican pesos"><strong>400</strong></output></div>
+                <div class="denomination-row"><data class="denomination" value="100">100</data><span class="row-operator" aria-hidden="true">×</span><input id="en-100" type="number" min="0" step="1" inputmode="numeric" value="4" aria-label="Quantity of 100 Mexican pesos"><span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="en-100" aria-label="Subtotal: 400 Mexican pesos"><strong>400</strong></output></div>
+                <div class="denomination-row"><data class="denomination" value="50">50</data><span class="row-operator" aria-hidden="true">×</span><input id="en-50" type="number" min="0" step="1" inputmode="numeric" value="1" aria-label="Quantity of 50 Mexican pesos"><span class="row-operator" aria-hidden="true">=</span><output class="subtotal" for="en-50" aria-label="Subtotal: 50 Mexican pesos"><strong>50</strong></output></div>
+              </div>
+            </fieldset>
+          </form>
+        </main>
+        <nav class="bottom-nav" aria-label="CYNDY internal navigation">
+          <button class="nav-item" type="button" aria-current="page"><span class="nav-icon" aria-hidden="true">⌗</span><span>Count</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">◷</span><span>History</span></button>
+          <button class="nav-item" type="button"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></button>
+        </nav>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

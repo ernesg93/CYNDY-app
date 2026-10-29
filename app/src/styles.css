@@ -228,6 +228,46 @@ button.secondary {
 :root[data-theme="dark"] .history-record-link, :root[data-theme="dark"] .history-empty-symbol { border-color:#43554f; }
 :root[data-theme="dark"] .history-record-link { color:#f3f7f4; }
 :root[data-theme="dark"] .history-record-link span, :root[data-theme="dark"] .history-empty-symbol { color:#8ce5ca; }
+/* Settings repair and destructive-reset hierarchy. */
+.settings-page .eyebrow { margin-top:0; }
+.settings-page h1 { margin:0; }
+.settings-intro,
+.settings-repair-note { color:#52625d; font-size:.875rem; line-height:1.45; }
+.settings-intro { margin:8px 0 16px; }
+.settings-repair-note { margin:0; font-size:.75rem; }
+.settings-page form { display:grid; gap:12px; }
+.settings-page fieldset { min-inline-size:0; margin:0; padding:12px; border:1px solid #c7d2c8; border-radius:18px; }
+.settings-page legend { padding-inline:4px; font-size:.875rem; font-weight:800; }
+.settings-page .field { gap:4px; margin-block:8px; }
+.settings-page .field:first-of-type { margin-block-start:4px; }
+.settings-page label { color:#52625d; font-size:.75rem; font-weight:750; }
+.settings-page input { width:100%; border-radius:12px; background:#edf4f0; }
+.settings-page input[aria-invalid="true"] { border:2px solid #9b1c1c; }
+.field-error { margin:0; font-size:.75rem; line-height:1.35; }
+.field-error::before { content:"! "; }
+.settings-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.settings-actions button { min-width:0; padding-inline:12px; }
+.settings-actions button:first-child { color:#16211a; background:#edf4f0; border:1px solid #c7d2c8; }
+.dashboard-reset-button { color:#9b1c1c; background:transparent; border:1px solid #9b1c1c; }
+.confirmation { color:#16211a; background:#fff; box-shadow:0 16px 36px rgb(0 0 0 / 28%); }
+.confirmation::backdrop { background:rgb(22 32 30 / 48%); }
+.confirmation--reset { padding:20px; border:1px solid #c7d2c8; border-radius:18px; }
+.confirmation--reset h3 { margin:0; font-size:1.3rem; }
+.confirmation--reset > p:not(.danger-kicker) { margin:8px 0 16px; color:#52625d; font-size:.875rem; line-height:1.45; }
+.danger-kicker { margin:0 0 8px; color:#9b1c1c; font-size:.75rem; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
+.dialog-actions { display:grid; grid-template-columns:1fr; gap:8px; }
+.dialog-actions button { width:100%; }
+:root[data-theme="dark"] .settings-intro,
+:root[data-theme="dark"] .settings-repair-note,
+:root[data-theme="dark"] .settings-page label,
+:root[data-theme="dark"] .confirmation--reset > p:not(.danger-kicker) { color:#b0c0ba; }
+:root[data-theme="dark"] .settings-page fieldset,
+:root[data-theme="dark"] .settings-actions button:first-child { border-color:#43554f; }
+:root[data-theme="dark"] .settings-page input,
+:root[data-theme="dark"] .settings-actions button:first-child { color:#f3f7f4; background:#22312e; }
+:root[data-theme="dark"] .confirmation { color:#f3f7f4; background:#182522; border-color:#43554f; }
+:root[data-theme="dark"] .dashboard-reset-button { color:#ffb4ab; border-color:#ffb4ab; }
+:root[data-theme="dark"] .danger-kicker { color:#ffb4ab; }
 @media print {
   .skip-link,
   .app-header,

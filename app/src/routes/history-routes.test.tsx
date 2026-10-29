@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { IDBFactory } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { calculateCountSnapshots } from "../domain/count";
@@ -180,6 +180,51 @@ describe("stored count routes", () => {
     await waitFor(() => expect(document.activeElement).toBe(alert));
     expect(failure).toHaveBeenCalledWith("count-1");
     expect(await repository.getCount("count-1")).toBeTruthy();
+  });
+
+  it("renders the approved settings repair hierarchy and field-level validation without persistence", async () => {
+    const repository = await historyRepository();
+    window.history.replaceState({}, "", "/settings");
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Settings" });
+
+    const page = screen.getByRole("heading", { name: "Settings" }).closest<HTMLElement>(".settings-page");
+    expect(page).toBeTruthy();
+    expect(within(page!).getByText("Local settings").classList.contains("eyebrow")).toBe(true);
+    expect(within(page!).getByText(
+      "Edit the currencies and positive whole-number denominations used by future counts.",
+    ).classList.contains("settings-intro")).toBe(true);
+    const denominations = screen.getByLabelText("Denominations (comma separated)");
+    fireEvent.change(denominations, { target: { value: "5, 5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+
+    const error = await screen.findByText("Denominations must be unique.");
+    expect(error.classList.contains("field-error")).toBe(true);
+    expect(denominations.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("button", { name: "Add another currency" }).parentElement?.classList
+      .contains("settings-actions")).toBe(true);
+    expect(await repository.getCurrencyConfigurations()).toHaveLength(1);
+  });
+
+  it("renders the approved destructive final-reset hierarchy while retaining safe cancellation", async () => {
+    const repository = await historyRepository();
+    render(<ApplicationRoutes repository={repository} />);
+    await screen.findByRole("heading", { name: "Dashboard" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reset all local data" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Final reset confirmation" });
+    expect(dialog.classList.contains("confirmation--reset")).toBe(true);
+    expect(within(dialog).getByText("Local data").classList.contains("danger-kicker")).toBe(true);
+    expect(within(dialog).getByRole("button", { name: "Cancel reset" }).parentElement?.classList
+      .contains("dialog-actions")).toBe(true);
+    await waitFor(() => expect(document.activeElement).toBe(
+      within(dialog).getByRole("button", { name: "Cancel reset" }),
+    ));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel reset" }));
+
+    expect(await repository.getCurrencyConfigurations()).toHaveLength(1);
+    expect(await repository.listCounts()).toHaveLength(2);
   });
 
   it("cancels reset at either confirmation without changing settings or counts", async () => {

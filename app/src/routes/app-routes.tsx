@@ -168,7 +168,7 @@ export function ConfigurationForm({ values, issues, index, onChange }: Configura
           aria-describedby={issue ? errorId : undefined}
           onChange={(event) => onChange({ ...values, [name]: event.target.value })}
         />
-        {issue && <span id={errorId} className="error" role="alert">{formatIssue(issue.message)}</span>}
+        {issue && <span id={errorId} className="error field-error" role="alert">{formatIssue(issue.message)}</span>}
       </div>
     );
   };
@@ -303,9 +303,10 @@ function Dashboard({ repository, onReset }: {
     {resetError && <p ref={resetErrorRef} className="error" role="alert" tabIndex={-1}>
       {resetError}
     </p>}
-    {resetStage === 0 ? <button ref={resetButtonRef} type="button" onClick={() => {
+    {resetStage === 0 ? <button ref={resetButtonRef} className="dashboard-reset-button" type="button" onClick={() => {
       setResetError(undefined); setResetStage(1);
     }}>Reset all local data</button> : <ConfirmationPanel
+      variant="reset"
       title={resetStage === 1 ? "Reset all local data?" : "Final reset confirmation"}
       description={resetStage === 1
         ? "This will permanently delete every saved count and all currency settings."
@@ -422,9 +423,9 @@ function ReceiptPage({ countId, repository, destination }: {
   return <Page title="Count receipt"><ReceiptView record={record} destination={destination} /></Page>;
 }
 
-function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCancel, onConfirm }: {
+function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCancel, onConfirm, variant }: {
   title: string; description: string; cancelLabel: string; confirmLabel: string;
-  onCancel: () => void; onConfirm: () => void;
+  onCancel: () => void; onConfirm: () => void; variant?: "reset";
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -437,12 +438,13 @@ function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCa
     cancelRef.current?.focus();
     return () => { if (dialog.open && typeof dialog.close === "function") dialog.close(); };
   }, [title]);
-  return <dialog ref={dialogRef} className="confirmation" role="alertdialog"
+  return <dialog ref={dialogRef} className={`confirmation${variant ? ` confirmation--${variant}` : ""}`} role="alertdialog"
     onCancel={(event) => { event.preventDefault(); onCancel(); }}
     aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`}>
+    {variant === "reset" && <p className="danger-kicker">Local data</p>}
     <h3 id={`${id}-title`}>{title}</h3>
     <p id={`${id}-description`}>{description}</p>
-    <div className="actions">
+    <div className={variant === "reset" ? "dialog-actions" : "actions"}>
       <button ref={cancelRef} type="button" onClick={onCancel}>{cancelLabel}</button>
       <button className="danger" type="button" onClick={onConfirm}>{confirmLabel}</button>
     </div>
@@ -531,8 +533,9 @@ function SettingsPage({ configurations, repository, onSaved }: {
     }
   };
 
-  return <Page title="Settings">
-    <p>Edit the currencies and positive whole-number denominations used by future counts.</p>
+  return <Page title="Settings" className="settings-page">
+    <p className="eyebrow">Local settings</p>
+    <p className="settings-intro">Edit the currencies and positive whole-number denominations used by future counts.</p>
     {error && <p ref={messageRef} className="error" role="alert" tabIndex={-1}>{error}</p>}
     {message && !error && <p ref={messageRef} className="status" role="status" tabIndex={-1}>{message}</p>}
     <form ref={formRef} onSubmit={(event: FormEvent) => { event.preventDefault(); void save(); }} noValidate>
@@ -542,12 +545,15 @@ function SettingsPage({ configurations, repository, onSaved }: {
           setValues(values.map((value, itemIndex) => itemIndex === index ? draft : value));
           setMessage(undefined);
         }} />)}
-      {values.length < 2 && <button type="button"
-        onClick={() => {
-          setValues([...values, emptyConfiguration]);
-          setMessage(undefined);
-        }}>Add another currency</button>}
-      <button type="submit">Save settings</button>
+      <div className="settings-actions">
+        {values.length < 2 && <button type="button"
+          onClick={() => {
+            setValues([...values, emptyConfiguration]);
+            setMessage(undefined);
+          }}>Add another currency</button>}
+        <button type="submit">Save settings</button>
+      </div>
+      <p className="settings-repair-note">Changes apply to future counts. Saved counts keep their original values.</p>
     </form>
   </Page>;
 }
@@ -671,8 +677,10 @@ export function LocalSettingsErrorPage({ message }: { message: string }) {
   </Page></AppShell>;
 }
 
-function Page({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section className="card" aria-labelledby="page-title">
+function Page({ title, children, className }: {
+  title: string; children: React.ReactNode; className?: string;
+}) {
+  return <section className={`card${className ? ` ${className}` : ""}`} aria-labelledby="page-title">
     <h1 id="page-title">{title}</h1>{children}
   </section>;
 }

@@ -448,6 +448,25 @@ describe("application shell accessibility", () => {
 });
 
 describe("new count route", () => {
+  it("describes each quantity subtotal with its value and currency while keeping the visible subtotal numeric-only", async () => {
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "New count" });
+
+    const quantity = screen.getByLabelText("$1 quantity");
+    const description = document.getElementById("usd:1-subtotal-description");
+    const visibleSubtotal = document.getElementById("usd:1-subtotal");
+
+    expect(quantity.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description");
+    expect(description?.textContent).toBe("Subtotal: $0 USD");
+    expect(visibleSubtotal?.textContent).toBe("0");
+    expect(visibleSubtotal?.getAttribute("aria-label")).toBeNull();
+
+    fireEvent.change(quantity, { target: { value: "3" } });
+    expect(description?.textContent).toBe("Subtotal: $3 USD");
+    expect(visibleSubtotal?.textContent).toBe("3");
+  });
+
   it("renders passive fieldset-scoped totals that update independently", async () => {
     const store = routeRepository([validConfiguration, secondConfiguration]);
     window.history.replaceState({}, "", "/count/new");
@@ -480,7 +499,7 @@ describe("new count route", () => {
     }
     expect(within(dollars).queryByRole("status")).toBeNull();
     expect(within(dollars).queryByRole("alert")).toBeNull();
-    expect(screen.getByLabelText("$5 quantity").getAttribute("aria-describedby")).toBe("usd:5-subtotal");
+    expect(screen.getByLabelText("$5 quantity").getAttribute("aria-describedby")).toBe("usd:5-subtotal-description");
   });
 
   it("saves two independent currency snapshots with an automatic timestamp and note", async () => {
@@ -504,11 +523,11 @@ describe("new count route", () => {
     const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
     const euros = screen.getByRole("group", { name: "Euro (EUR)" });
     expect(within(dollars).getByText("1")).toBeTruthy();
-    expect(within(dollars).getByLabelText("Subtotal: $3 USD")).toBeTruthy();
-    expect(within(dollars).getByLabelText("Subtotal: $10 USD")).toBeTruthy();
+    expect(within(dollars).getByText("3")).toBeTruthy();
+    expect(within(dollars).getByText("10")).toBeTruthy();
     expect(within(dollars).getByText("$13 USD")).toBeTruthy();
-    expect(within(euros).getByLabelText("Subtotal: €8 EUR")).toBeTruthy();
-    expect(within(euros).getByLabelText("Subtotal: €5 EUR")).toBeTruthy();
+    expect(within(euros).getByText("8")).toBeTruthy();
+    expect(document.getElementById("eur:5-subtotal")?.textContent).toBe("5");
     expect(within(euros).getByText("€13 EUR")).toBeTruthy();
     expect(within(dollars).queryByRole("status")).toBeNull();
     const quantity = screen.getByLabelText("$1 quantity");
@@ -558,7 +577,7 @@ describe("new count route", () => {
       "Quantities must be non-negative integers.",
     );
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(input.getAttribute("aria-describedby")).toContain("usd:1-error");
+    expect(input.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description usd:1-error");
     expect(store.saveCount).not.toHaveBeenCalled();
   });
 
@@ -577,7 +596,7 @@ describe("new count route", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(invalidQuantity.getAttribute("aria-invalid")).toBe("true");
     expect(secondInvalidQuantity.getAttribute("aria-invalid")).toBe("true");
-    expect(invalidQuantity.getAttribute("aria-describedby")).toContain("usd:1-error");
+    expect(invalidQuantity.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description usd:1-error");
     expect(screen.getAllByText("Enter a non-negative whole number within the safe integer range.")).toHaveLength(2);
 
     const clear = screen.getByRole("button", { name: "Clear unsaved count" });
@@ -589,7 +608,7 @@ describe("new count route", () => {
     expect(invalidQuantity.getAttribute("aria-invalid")).toBeNull();
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getAllByLabelText(/Subtotal: [$€]0/)).toHaveLength(4);
+    expect(document.querySelectorAll(".visually-hidden[id$='-subtotal-description']")).toHaveLength(4);
     expect(screen.getByText("$0 USD")).toBeTruthy();
     expect(screen.getByText("€0 EUR")).toBeTruthy();
     expect(document.activeElement).toBe(clear);

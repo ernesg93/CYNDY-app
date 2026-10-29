@@ -738,6 +738,7 @@ function CountPage({ configurations, repository, state, onChange }: {
       {snapshots[currencyIndex].entries.map((entry) => {
         const key = `${configuration.id}:${entry.denomination}`;
         const subtotalId = `${key}-subtotal`;
+        const subtotalDescriptionId = `${subtotalId}-description`;
         const errorId = `${key}-error`;
         const invalid = invalidQuantityKeys.has(key);
         return <div className="denomination-row" key={key}>
@@ -746,7 +747,7 @@ function CountPage({ configurations, repository, state, onChange }: {
           <input id={key} type="number" min="0" step="1" inputMode="numeric"
             aria-label={`${configuration.symbol}${entry.denomination} ${t("quantity")}`}
             aria-invalid={invalid ? true : undefined}
-            aria-describedby={`${subtotalId}${invalid ? ` ${errorId}` : ""}`}
+            aria-describedby={`${subtotalDescriptionId}${invalid ? ` ${errorId}` : ""}`}
             value={draft[key] ?? ""}
             onChange={(event) => {
               const value = event.target.value;
@@ -756,8 +757,10 @@ function CountPage({ configurations, repository, state, onChange }: {
                   : invalidQuantityKeys });
             }} />
           <span className="row-operator" aria-hidden="true">=</span>
-          <span id={subtotalId} className="denomination-subtotal"
-            aria-label={`${t("Subtotal")}: ${configuration.symbol}${entry.total} ${configuration.code}`}>{entry.total}</span>
+          <span id={subtotalId} className="denomination-subtotal">{entry.total}</span>
+          <span id={subtotalDescriptionId} className="visually-hidden">
+            {t("Subtotal")}: {configuration.symbol}{entry.total} {configuration.code}
+          </span>
           {invalid && <span id={errorId} className="error">
             {t("Enter a non-negative whole number within the safe integer range.")}
           </span>}

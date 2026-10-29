@@ -78,6 +78,37 @@ describe("stored count routes", () => {
     expectNeutralLanguage();
   });
 
+  it("renders approved History cards while preserving newest-first record links and independent subtotals", async () => {
+    const repository = await historyRepository();
+    window.history.replaceState({}, "", "/history");
+    render(<ApplicationRoutes repository={repository} />);
+
+    const list = await screen.findByRole("list", { name: "Saved local counts" });
+    expect(list.classList.contains("history-list")).toBe(true);
+    const cards = list.querySelectorAll(".history-record-card");
+    expect(cards).toHaveLength(2);
+    expect(cards[0].querySelector("time")?.dateTime).toBe("2026-10-12T12:00:00.000Z");
+    expect(cards[0].querySelectorAll(".history-subtotals li")).toHaveLength(1);
+    expect(cards[1].querySelectorAll(".history-subtotals li")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "View count count-2" }).getAttribute("href"))
+      .toBe("/history/count-2");
+  });
+
+  it("renders the approved empty History state with a count action", async () => {
+    const repository = new IndexedDbRepository({
+      databaseName: crypto.randomUUID(),
+      indexedDB: new IDBFactory(),
+    });
+    await repository.saveCurrencyConfigurations([dollar]);
+    window.history.replaceState({}, "", "/history");
+    render(<ApplicationRoutes repository={repository} />);
+
+    const emptyState = await screen.findByRole("region", { name: "No saved counts yet" });
+    expect(emptyState.classList.contains("history-empty-state")).toBe(true);
+    expect(screen.getByRole("link", { name: "Start a count" }).getAttribute("href"))
+      .toBe("/count/new");
+  });
+
   it("renders immutable denomination entries, timestamp, subtotals, and current note", async () => {
     const repository = await historyRepository();
     await repository.updateCountNote("count-1", "Updated current note");

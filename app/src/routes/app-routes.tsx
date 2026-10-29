@@ -332,10 +332,24 @@ function HistoryPage({ repository }: { repository: IndexedDbRepository }) {
     void repository.listCounts().then(setCounts).catch(() => setError(true));
   }, [repository]);
   if (error) return <RecordsError />;
-  return <Page title="History">{counts ? (counts.length ? <ul>{counts.map((count) => <li key={count.id}>
-    <CountTime record={count} /><SnapshotSubtotals record={count} />
-    <a href={`/history/${encodeURIComponent(count.id)}`}>View count {count.id}</a>
-  </li>)}</ul> : <p>No saved counts yet.</p>) : <p role="status">Loading history…</p>}</Page>;
+  return <Page title="History">
+    <p className="eyebrow">Local history</p>
+    {counts ? (counts.length ? <>
+      <p className="history-intro">Saved on this device, newest first. Totals remain separate by currency.</p>
+      <ul className="history-list" aria-label="Saved local counts">{counts.map((count) => <li key={count.id}>
+        <article className="history-record-card">
+          <CountTime record={count} className="history-record-date" />
+          <SnapshotSubtotals record={count} className="history-subtotals" />
+          <a className="history-record-link" href={`/history/${encodeURIComponent(count.id)}`}>View count {count.id}<span aria-hidden="true">→</span></a>
+        </article>
+      </li>)}</ul>
+    </> : <section className="history-empty-state" aria-labelledby="empty-history-title">
+      <span className="history-empty-symbol" aria-hidden="true">◷</span>
+      <div><h2 id="empty-history-title">No saved counts yet</h2>
+        <p>Counts saved on this device will appear here. Start a count when you are ready.</p></div>
+      <a className="button history-empty-action" href="/count/new">Start a count<span aria-hidden="true">→</span></a>
+    </section>) : <p role="status">Loading history…</p>}
+  </Page>;
 }
 
 function CountDetailPage({ countId, repository }: {
@@ -435,12 +449,12 @@ function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCa
   </dialog>;
 }
 
-function CountTime({ record }: { record: CountRecord }) {
-  return <time dateTime={record.createdAt}>{record.createdAt}</time>;
+function CountTime({ record, className }: { record: CountRecord; className?: string }) {
+  return <time className={className} dateTime={record.createdAt}>{record.createdAt}</time>;
 }
 
-function SnapshotSubtotals({ record }: { record: CountRecord }) {
-  return <ul>{record.snapshots.map((snapshot) => <li key={snapshot.currencyId}>
+function SnapshotSubtotals({ record, className }: { record: CountRecord; className?: string }) {
+  return <ul className={className}>{record.snapshots.map((snapshot) => <li key={snapshot.currencyId}>
     {snapshot.symbol}{snapshot.subtotal} {snapshot.code}
   </li>)}</ul>;
 }

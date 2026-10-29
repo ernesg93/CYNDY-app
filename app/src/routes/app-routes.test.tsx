@@ -312,12 +312,13 @@ describe("configuration routes", () => {
 });
 
 describe("application shell accessibility", () => {
-  it("defines narrow Count-row reflow and readable dark-theme errors", () => {
+  it("defines narrow Count-row reflow and readable dark-theme feedback", () => {
     const styles = readFileSync("src/styles.css", "utf8");
 
     expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+12px\s+minmax\(0,\s*1fr\);[\s\S]*?grid-template-areas:\s*["']denomination multiply quantity["']\s*["']equals equals subtotal["'];[\s\S]*?\}/);
     expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-value\s*\{\s*grid-area:\s*denomination;\s*\}[\s\S]*?\.denomination-row input\s*\{\s*grid-area:\s*quantity;\s*\}[\s\S]*?\.row-operator:nth-of-type\(1\)\s*\{\s*grid-area:\s*multiply;\s*\}[\s\S]*?\.row-operator:nth-of-type\(2\)\s*\{\s*grid-area:\s*equals;\s*\}[\s\S]*?\.denomination-subtotal\s*\{\s*grid-area:\s*subtotal;\s*\}/);
     expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.error\s*\{\s*color:\s*#ffb4ab;\s*\}/);
+    expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.status\s*\{\s*color:\s*#f3f7f4;\s*background:\s*#174a29;\s*\}/);
   });
 
   it.each([
@@ -396,6 +397,27 @@ describe("application shell accessibility", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
     expect(document.querySelector(".app-header")).toBeTruthy();
     expect(document.querySelector(".bottom-nav")).toBeTruthy();
+  });
+
+  it("renders local routes and updates preferences when localStorage is unavailable", async () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage denied");
+    });
+    window.history.replaceState({}, "", "/count/new");
+
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.click(screen.getByRole("button", { name: "Change theme" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change language" }));
+
+    expect(await screen.findByRole("heading", { name: "Nuevo conteo" })).toBeTruthy();
+    expect(getItem).toHaveBeenCalledWith("cyndy.locale");
+    expect(getItem).toHaveBeenCalledWith("cyndy.theme");
+    expect(setItem).toHaveBeenCalledWith("cyndy.theme", "light");
+    expect(setItem).toHaveBeenCalledWith("cyndy.locale", "es");
   });
 
   it("puts an operable skip link first in keyboard order", async () => {

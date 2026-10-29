@@ -290,6 +290,7 @@ button.secondary {
 :root[data-theme="dark"] .dashboard-reset-button { color:#ffb4ab; border-color:#ffb4ab; }
 :root[data-theme="dark"] .danger-kicker { color:#ffb4ab; }
 :root[data-theme="dark"] .error { color:#ffb4ab; }
+:root[data-theme="dark"] .status { color:#f3f7f4; background:#174a29; }
 @media print {
   .skip-link,
   .app-header,

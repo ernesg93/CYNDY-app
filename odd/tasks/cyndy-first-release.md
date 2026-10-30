@@ -11,7 +11,7 @@ S3. "perfecto. implementemos el plan"
 - [x] T1 [S1-S3] Verify candidate and safe upgrade with isolated synthetic data; route: inline; evidence: old note and new title preserved after service-worker upgrade and offline reopen; commit: not applicable.
 - [x] T2 [S1-S3] Prepare release documentation, version proposal, rollback and security evidence; route: inline; evidence: README, checklist and release-operation; propose existing 0.1.0; commit: b210830.
 - [x] T3 [S1-S3] Review candidate, run final checks and prepare reviewable commits preserving unrelated changes; route: inline; delivery: tracker b210830 and child 1810801; independent verification passed; commit: 1810801.
-- [!] T4 [S1-S3] Obtain required release decisions and publish only with explicit authorization; route: inline; blocked: physical Android update acceptance and publication authorization; version 0.1.0 confirmed; exposed ngrok token revoked per user; commit: not applicable.
+- [!] T4 [S1-S3] Obtain required release decisions and publish only with explicit authorization; route: inline; blocked: explicit authorization for push, PR creation and production merge; version 0.1.0 confirmed; Android update accepted; exposed token revoked; commit: not applicable.
 - [ ] T5 [S1-S3] Verify deployment and propose safe cleanup; route: inline; commit: pending.
 
 ## Log
@@ -23,3 +23,4 @@ L5. Final checks: 88 automated tests, production build, 10 browser tests and git
 L6. User selected: "Cadena con rama de seguimiento (recomendada)". Tracker documentation commit b210830 (native assessment passive); child application commit 1810801 (native medium, escalated high for data compatibility, 401 changed lines). Independent verifier passed 88 unit tests, build, 10 E2E tests and legacy-note offline probe. Remote PRs and publication still require separate authorization.
 L7. "mantener el 0.1.0"
 L8. "hecho, token revocado"
+L9. User confirmed Android synthetic test: "listo, se actualizo" and "si" to old note and new titled count remaining visible after offline reload. Incognito test was separate from production.

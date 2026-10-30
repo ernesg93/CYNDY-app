@@ -11,7 +11,7 @@ S3. "perfecto. implementemos el plan"
 - [x] T1 [S1-S3] Verify candidate and safe upgrade with isolated synthetic data; route: inline; evidence: old note and new title preserved after service-worker upgrade and offline reopen; commit: not applicable.
 - [x] T2 [S1-S3] Prepare release documentation, version proposal, rollback and security evidence; route: inline; evidence: README, checklist and release-operation; propose existing 0.1.0; commit: b210830.
 - [x] T3 [S1-S3] Review candidate, run final checks and prepare reviewable commits preserving unrelated changes; route: inline; delivery: tracker b210830 and child 1810801; independent verification passed; commit: 1810801.
-- [!] T4 [S1-S3] Obtain required release decisions and publish only with explicit authorization; route: inline; blocked: explicit authorization for push, PR creation and production merge; version 0.1.0 confirmed; Android update accepted; exposed token revoked; commit: not applicable.
+- [!] T4 [S1-S3] Obtain required release decisions and publish only with explicit authorization; route: inline; blocked: new approved issue creation and protected status:approved label authorization; version 0.1.0 confirmed; Android update accepted; exposed token revoked; commit: not applicable.
 - [ ] T5 [S1-S3] Verify deployment and propose safe cleanup; route: inline; commit: pending.
 
 ## Log
@@ -24,3 +24,4 @@ L6. User selected: "Cadena con rama de seguimiento (recomendada)". Tracker docum
 L7. "mantener el 0.1.0"
 L8. "hecho, token revocado"
 L9. User confirmed Android synthetic test: "listo, se actualizo" and "si" to old note and new titled count remaining visible after offline reload. Incognito test was separate from production.
+L10. User authorized pushing branches and opening PRs: "vamos con todo !!!! xd". Issue-first policy requires an approved issue; current issues are closed and do not cover this release. A new issue and exact protected status:approved label require separate direct authorization. Merge remains separately gated.

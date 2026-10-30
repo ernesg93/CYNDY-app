@@ -71,6 +71,77 @@ test("an unknown direct route renders safely without mutating local records", as
   await expect.poll(() => snapshotLocalData(page)).toEqual(before);
 });
 
+test("mobile header keeps controls on one row with readable dark colors", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/onboarding");
+  const header = page.locator(".app-header");
+  const boxes = await Promise.all([header.locator(".home-control").boundingBox(), header.locator(".brand").boundingBox(), header.locator(".header-actions").boundingBox()]);
+  expect(boxes.every(Boolean)).toBe(true);
+  expect(Math.abs(boxes[0]!.y - boxes[2]!.y)).toBeLessThan(2);
+  expect(boxes[1]!.x).toBeGreaterThanOrEqual(boxes[0]!.x + boxes[0]!.width);
+  expect(boxes[1]!.x + boxes[1]!.width).toBeLessThanOrEqual(boxes[2]!.x);
+  await expect(header.locator(".home-control")).toHaveCSS("color", "rgb(243, 247, 244)");
+  await expect(header.locator(".brand")).toHaveCSS("color", "rgb(243, 247, 244)");
+});
+
+test("mobile count rows keep denomination, quantity and subtotal on one line", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await configureCountCurrencies(page);
+  const row = page.locator(".denomination-row").first();
+  const geometry = await row.evaluate((element) => {
+    const label = element.querySelector(".denomination-value")!.getBoundingClientRect();
+    const input = element.querySelector("input")!.getBoundingClientRect();
+    const subtotal = element.querySelector(".denomination-subtotal")!.getBoundingClientRect();
+    return { labelTop: label.top, inputTop: input.top, subtotalTop: subtotal.top,
+      inputHeight: input.height, overflow: document.documentElement.scrollWidth > innerWidth };
+  });
+  expect(geometry.labelTop).toBe(geometry.inputTop);
+  expect(geometry.subtotalTop).toBe(geometry.inputTop);
+  expect(geometry.inputHeight).toBeGreaterThanOrEqual(44);
+  expect(geometry.overflow).toBe(false);
+});
+
+test("five digit denominations and large totals fit on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/onboarding");
+  await page.getByLabel("Currency name").fill("Peso");
+  await page.getByLabel("Symbol").fill("$");
+  await page.getByLabel("Currency code").fill("CUP");
+  await page.getByLabel("Denominations (comma separated)").fill("20000, 1");
+  await page.getByRole("button", { name: "Save configuration" }).click();
+  await page.goto("/count/new");
+  await page.getByLabel("$20000 quantity").fill("99999999");
+  const geometry = await page.locator(".currency-fieldset").evaluate((fieldset) => {
+    const label = fieldset.querySelector<HTMLElement>(".denomination-value")!;
+    const total = fieldset.querySelector<HTMLElement>(".currency-total")!;
+    return { labelFits: label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight,
+      labelHeight: label.getBoundingClientRect().height, totalFont: getComputedStyle(total).fontSize,
+      totalFits: total.scrollWidth <= total.clientWidth };
+  });
+  expect(geometry.labelFits).toBe(true);
+  expect(geometry.labelHeight).toBeLessThan(60);
+  expect(parseFloat(geometry.totalFont)).toBeGreaterThanOrEqual(16);
+  expect(geometry.totalFits).toBe(true);
+});
+
+test("large quantities remain visible without overflowing their mobile row", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await configureCountCurrencies(page);
+  const input = page.getByLabel("$14 quantity");
+  await input.fill("99999999");
+  const row = page.locator(".denomination-row").first();
+  const subtotal = row.locator(".denomination-subtotal");
+  await expect(subtotal).toHaveText("1399999986");
+  await expect(subtotal).toHaveClass(/denomination-subtotal--long/);
+  const fit = await row.evaluate((element) => {
+    const input = element.querySelector("input")!;
+    const subtotal = element.querySelector<HTMLElement>(".denomination-subtotal")!;
+    return { inputFits: input.scrollWidth <= input.clientWidth, subtotalFits: subtotal.scrollWidth <= subtotal.clientWidth,
+      overflow: document.documentElement.scrollWidth > innerWidth };
+  });
+  expect(fit).toEqual({ inputFits: true, subtotalFits: true, overflow: false });
+});
+
 test("compact currency totals stay fieldset-bound and clear keyboard focus at 200% zoom", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 520 });
   await configureCountCurrencies(page);
@@ -82,7 +153,7 @@ test("compact currency totals stay fieldset-bound and clear keyboard focus at 20
   await expect(total).toHaveCSS("position", "sticky");
 
   const target = firstFieldset.getByLabel("$11 quantity");
-  const previous = firstFieldset.getByLabel("$10 quantity");
+  const previous = firstFieldset.getByLabel("$12 quantity");
   await previous.focus();
   await page.keyboard.press("Tab");
   await expect(target).toBeFocused();

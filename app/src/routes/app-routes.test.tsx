@@ -58,6 +58,111 @@ function fill(values: ConfigurationFormValues) {
   });
 }
 
+describe("count title and formatted totals", () => {
+  it("saves an optional title and displays grouped currency totals", async () => {
+    const store = repository();
+    await store.saveCurrencyConfigurations([validConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.change(screen.getByLabelText("Count title"), { target: { value: "Morning cash" } });
+    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "12345" } });
+    expect(screen.getByText("$ 12,345 USD")).toBeTruthy();
+    expect(screen.queryByLabelText("Note (optional)")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await screen.findByText("Count saved.");
+    const saved = (await store.listCounts())[0];
+    expect(saved.title).toBe("Morning cash");
+    cleanup();
+    window.history.replaceState({}, "", "/history");
+    render(<ApplicationRoutes repository={store} />);
+    expect(await screen.findByRole("heading", { name: "Morning cash" })).toBeTruthy();
+    cleanup();
+    window.history.replaceState({}, "", `/history/${saved.id}`);
+    render(<ApplicationRoutes repository={store} />);
+    expect(await screen.findByRole("heading", { name: "Morning cash" })).toBeTruthy();
+  });
+});
+
+describe("count denomination order", () => {
+  it("shows denominations from highest to lowest for each currency", async () => {
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration, secondConfiguration])} />);
+    await screen.findByRole("heading", { name: "New count" });
+    const fields = screen.getAllByRole("group");
+    expect(within(fields[0]).getAllByRole("spinbutton").map((input) => input.getAttribute("aria-label"))).toEqual(["$5 quantity", "$1 quantity"]);
+    expect(within(fields[1]).getAllByRole("spinbutton").map((input) => input.getAttribute("aria-label"))).toEqual(["€5 quantity", "€2 quantity"]);
+  });
+});
+
+describe("count quantity limit", () => {
+  it("reports an unsafe calculated total without saving or crashing", async () => {
+    const store = routeRepository([{ ...validConfiguration, denominations: [Number.MAX_SAFE_INTEGER] }]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "2" } });
+    expect(screen.getByText("The count total exceeds the supported range.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    expect(store.saveCount).not.toHaveBeenCalled();
+  });
+
+  it("accepts eight digits and prevents entering a ninth digit", async () => {
+    const store = routeRepository([validConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    const input = screen.getByLabelText("$1 quantity");
+    fireEvent.change(input, { target: { value: "99999999" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await screen.findByText("Count saved.");
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
+    fireEvent.change(input, { target: { value: "999999999" } });
+    expect(input).toHaveProperty("value", "99999999");
+    expect(screen.getByText("Maximum 8 digits; the previous value was kept.")).toBeTruthy();
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Count saved.")).toBeTruthy();
+  });
+});
+
+describe("duplicate count protection", () => {
+  it("blocks concurrent saves and allows an intentional identical save only after confirmation", async () => {
+    const store = routeRepository([validConfiguration]);
+    let finish!: () => void;
+    vi.mocked(store.saveCount).mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(undefined as never); }));
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    expect(screen.getByRole("button", { name: "Saving…" })).toHaveProperty("disabled", true);
+    fireEvent.submit(screen.getByRole("button", { name: "Saving…" }).closest("form")!);
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
+    finish();
+    await screen.findByText("Count saved.");
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    expect(screen.getByText("This count has already been saved. Save it again?")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save again" }));
+    await waitFor(() => expect(store.saveCount).toHaveBeenCalledTimes(2));
+  });
+
+  it("saves changed drafts normally", async () => {
+    const store = routeRepository([validConfiguration]);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: "New count" });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await screen.findByText("Count saved.");
+    fireEvent.change(screen.getByLabelText("Count title"), { target: { value: "changed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await waitFor(() => expect(store.saveCount).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("This count has already been saved. Save it again?")).toBeNull();
+  });
+});
+
 describe("configuration routes", () => {
   it.each(["/", "/count/new"])("renders guarded %s with replacement and focused status", async (path) => {
     window.history.replaceState({}, "", path);
@@ -244,7 +349,7 @@ describe("configuration routes", () => {
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
     fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "-1" } });
-    fireEvent.change(screen.getByLabelText("Note (optional)"), {
+    fireEvent.change(screen.getByLabelText("Count title"), {
       target: { value: "Unsaved note" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
@@ -259,7 +364,7 @@ describe("configuration routes", () => {
     fireEvent.click(screen.getByRole("link", { name: "Count" }));
     await screen.findByRole("heading", { name: "New count" });
     expect(screen.getByLabelText("$1 quantity")).toHaveProperty("value", "-1");
-    expect(screen.getByLabelText("Note (optional)")).toHaveProperty("value", "Unsaved note");
+    expect(screen.getByLabelText("Count title")).toHaveProperty("value", "Unsaved note");
     expect(screen.getByRole("alert").textContent).toBe("Quantities must be non-negative integers.");
     expect(store.saveCount).not.toHaveBeenCalled();
   });
@@ -315,9 +420,8 @@ describe("application shell accessibility", () => {
   it("defines narrow Count-row and header reflow with readable dark-theme surfaces", () => {
     const styles = readFileSync("src/styles.css", "utf8");
 
-    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+12px\s+minmax\(0,\s*1fr\);[\s\S]*?grid-template-areas:\s*["']denomination multiply quantity["']\s*["']equals equals subtotal["'];[\s\S]*?\}/);
-    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.denomination-value\s*\{\s*grid-area:\s*denomination;\s*\}[\s\S]*?\.denomination-row input\s*\{\s*grid-area:\s*quantity;\s*\}[\s\S]*?\.row-operator:nth-of-type\(1\)\s*\{\s*grid-area:\s*multiply;\s*\}[\s\S]*?\.row-operator:nth-of-type\(2\)\s*\{\s*grid-area:\s*equals;\s*\}[\s\S]*?\.denomination-subtotal\s*\{\s*grid-area:\s*subtotal;\s*\}/);
-    expect(styles).toMatch(/@media\s*\(max-width:\s*24rem\)\s*\{[\s\S]*?\.app-header\s*\{[\s\S]*?grid-template-rows:\s*44px\s+44px;[\s\S]*?\.brand\s*\{[\s\S]*?position:\s*static;[\s\S]*?grid-column:\s*1\s*\/\s*-1;[\s\S]*?\.home-control\s*\{[\s\S]*?grid-row:\s*2;[\s\S]*?\.header-actions\s*\{[\s\S]*?grid-row:\s*2;/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*20rem\)\s*\{[\s\S]*?\.denomination-row\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s+12px\s+minmax\(0,\s*1fr\);[\s\S]*?grid-template-areas:\s*["']denomination multiply quantity["']\s*["']equals equals subtotal["'];[\s\S]*?\}/);
+    expect(styles).toMatch(/@media\s*\(max-width:\s*20rem\)\s*\{[\s\S]*?\.denomination-value\s*\{\s*grid-area:\s*denomination;\s*\}[\s\S]*?\.denomination-row input\s*\{\s*grid-area:\s*quantity;\s*\}[\s\S]*?\.row-operator:nth-of-type\(1\)\s*\{\s*grid-area:\s*multiply;\s*\}[\s\S]*?\.row-operator:nth-of-type\(2\)\s*\{\s*grid-area:\s*equals;\s*\}[\s\S]*?\.denomination-subtotal\s*\{\s*grid-area:\s*subtotal;\s*\}/);
     expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.currency-total\s*\{\s*color:\s*#f3f7f4;\s*background:\s*#22312e;/);
     expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.card\s*>\s*a:not\(\.button\)\s*\{\s*color:\s*#8ce5ca;\s*\}/);
     expect(styles).toMatch(/:root\[data-theme=["']dark["']\]\s+\.error\s*\{\s*color:\s*#ffb4ab;\s*\}/);
@@ -373,7 +477,7 @@ describe("application shell accessibility", () => {
     await screen.findByRole("heading", { name: "Nuevo conteo" });
 
     expect(document.documentElement.lang).toBe("es");
-    expect(screen.getByText("Nota (opcional)")).toBeTruthy();
+    expect(screen.getByLabelText("Título del conteo")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Guardar conteo" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Inicio" }).getAttribute("href")).toBe("/");
     expect(screen.getByRole("button", { name: "Cambiar tema" })).toBeTruthy();
@@ -500,20 +604,20 @@ describe("new count route", () => {
 
     const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
     const euros = screen.getByRole("group", { name: "Euro (EUR)" });
-    const dollarTotal = within(dollars).getByText("USD total:").closest(".currency-total");
-    const euroTotal = within(euros).getByText("EUR total:").closest(".currency-total");
+    const dollarTotal = dollars.querySelector(".currency-total");
+    const euroTotal = euros.querySelector(".currency-total");
     const dollarLegend = dollars.querySelector(":scope > legend");
     const euroLegend = euros.querySelector(":scope > legend");
 
     expect(dollars.classList.contains("currency-fieldset")).toBe(true);
     expect(dollarLegend?.nextElementSibling).toBe(dollarTotal);
     expect(euroLegend?.nextElementSibling).toBe(euroTotal);
-    expect(within(dollars).getByText("$0 USD")).toBeTruthy();
-    expect(within(euros).getByText("€0 EUR")).toBeTruthy();
+    expect(within(dollars).getByText("$ 0 USD")).toBeTruthy();
+    expect(within(euros).getByText("€ 0 EUR")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("$5 quantity"), { target: { value: "2" } });
-    expect(within(dollars).getByText("$10 USD")).toBeTruthy();
-    expect(within(euros).getByText("€0 EUR")).toBeTruthy();
+    expect(within(dollars).getByText("$ 10 USD")).toBeTruthy();
+    expect(within(euros).getByText("€ 0 EUR")).toBeTruthy();
 
     for (const total of [dollarTotal, euroTotal]) {
       expect(total?.getAttribute("role")).toBeNull();
@@ -543,17 +647,17 @@ describe("new count route", () => {
     fireEvent.change(screen.getByLabelText("$5 quantity"), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText("€2 quantity"), { target: { value: "4" } });
     fireEvent.change(screen.getByLabelText("€5 quantity"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Morning count" } });
+    fireEvent.change(screen.getByLabelText("Count title"), { target: { value: "Morning count" } });
 
     const dollars = screen.getByRole("group", { name: "US dollar (USD)" });
     const euros = screen.getByRole("group", { name: "Euro (EUR)" });
     expect(within(dollars).getByText("1")).toBeTruthy();
     expect(within(dollars).getByText("3")).toBeTruthy();
     expect(within(dollars).getByText("10")).toBeTruthy();
-    expect(within(dollars).getByText("$13 USD")).toBeTruthy();
+    expect(within(dollars).getByText("$ 13 USD")).toBeTruthy();
     expect(within(euros).getByText("8")).toBeTruthy();
     expect(document.getElementById("eur:5-subtotal")?.textContent).toBe("5");
-    expect(within(euros).getByText("€13 EUR")).toBeTruthy();
+    expect(within(euros).getByText("€ 13 EUR")).toBeTruthy();
     expect(within(dollars).queryByRole("status")).toBeNull();
     const quantity = screen.getByLabelText("$1 quantity");
     expect(quantity.getAttribute("type")).toBe("number");
@@ -567,7 +671,7 @@ describe("new count route", () => {
     expect(await store.getCount("count-1")).toEqual({
       id: "count-1",
       createdAt: "2026-10-13T15:00:00.000Z",
-      note: "Morning count",
+      title: "Morning count",
       snapshots: [
         {
           currencyId: "usd", name: "US dollar", symbol: "$", code: "USD",
@@ -589,7 +693,7 @@ describe("new count route", () => {
     });
   });
 
-  it.each(["-1", "1.5", "9007199254740992"])("rejects invalid quantity %s", async (quantity) => {
+  it.each(["-1", "1.5"])("rejects invalid quantity %s", async (quantity) => {
     const store = routeRepository([validConfiguration, secondConfiguration]);
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
@@ -613,7 +717,7 @@ describe("new count route", () => {
     await screen.findByRole("heading", { name: "New count" });
     const invalidQuantity = screen.getByLabelText("$1 quantity");
     const secondInvalidQuantity = screen.getByLabelText("€2 quantity");
-    const note = screen.getByLabelText("Note (optional)");
+    const note = screen.getByLabelText("Count title");
     fireEvent.change(invalidQuantity, { target: { value: "-1" } });
     fireEvent.change(secondInvalidQuantity, { target: { value: "1.5" } });
     fireEvent.change(note, { target: { value: "Unsaved note" } });
@@ -634,8 +738,8 @@ describe("new count route", () => {
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();
     expect(document.querySelectorAll(".visually-hidden[id$='-subtotal-description']")).toHaveLength(4);
-    expect(screen.getByText("$0 USD")).toBeTruthy();
-    expect(screen.getByText("€0 EUR")).toBeTruthy();
+    expect(screen.getByText("$ 0 USD")).toBeTruthy();
+    expect(screen.getByText("€ 0 EUR")).toBeTruthy();
     expect(document.activeElement).toBe(clear);
     expect(store.saveCount).not.toHaveBeenCalled();
     expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();

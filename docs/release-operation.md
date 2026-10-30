@@ -23,4 +23,4 @@ CYNDY is a static, Android-first PWA. A release changes the application shell, n
 
 ## Scope and remaining evidence
 
-An isolated Chromium test of the candidate upgrade, rollback and re-upgrade preserved an older synthetic note and a newly titled count, including offline reopening. The previous version displayed both records; the title was visible again after re-upgrade. Physical Android update and rollback compatibility remain to be checked for the actual release. The existing version is `0.1.0`; release numbering requires an explicit decision.
+An isolated Chromium test of the candidate upgrade, rollback and re-upgrade preserved an older synthetic note and a newly titled count, including offline reopening. The previous version displayed both records; the title was visible again after re-upgrade. A physical Android incognito test also confirmed an existing note and a new titled count after upgrade and offline reload, as reported by the user. Physical Android rollback and the actual production deployment remain to be checked. The first release retains version `0.1.0`.

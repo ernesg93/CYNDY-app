@@ -47,6 +47,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Set up CYNDY": "Configura CYNDY",
   "Dashboard": "Panel principal",
   "New count": "Nuevo conteo",
+  "Count title": "Título del conteo",
   "Settings": "Ajustes",
   "History": "Historial",
   "Page not found": "Página no encontrada",
@@ -102,6 +103,10 @@ const spanish: Readonly<Record<string, string>> = {
   "Local settings": "Ajustes locales",
   "Note (optional)": "Nota (opcional)",
   "Save count": "Guardar conteo",
+  "Saving…": "Guardando…",
+  "This count has already been saved. Save it again?": "Este conteo ya se guardó. ¿Quieres guardarlo nuevamente?",
+  "Save again": "Guardar nuevamente",
+  "Cancel": "Cancelar",
   "Clear unsaved count": "Limpiar conteo sin guardar",
   "Loading saved counts…": "Cargando conteos guardados…",
   "View count": "Ver conteo",
@@ -117,6 +122,9 @@ const spanish: Readonly<Record<string, string>> = {
   "Settings saved.": "Ajustes guardados.",
   "Quantities must be non-negative integers.": "Las cantidades deben ser enteros no negativos.",
   "Count saved.": "Conteo guardado.",
+  "Enter a whole number from 0 to 99999999.": "Ingresa un número entero entre 0 y 99999999.",
+  "Maximum 8 digits; the previous value was kept.": "Máximo 8 cifras; se conservó el valor anterior.",
+  "The count total exceeds the supported range.": "El total del conteo supera el rango permitido.",
   "Could not save the count. Try again.": "No se pudo guardar el conteo. Inténtalo de nuevo.",
   "name is required": "el nombre es obligatorio",
   "symbol is required": "el símbolo es obligatorio",
@@ -164,6 +172,7 @@ interface CountDraftState {
   readonly note: string;
   readonly message?: string;
   readonly invalidQuantityKeys: ReadonlySet<string>;
+  readonly lastSavedCount?: string;
 }
 
 export function resolveRoute(
@@ -449,6 +458,7 @@ function Dashboard({ repository, onReset }: {
 
 function HistoryPage({ repository }: { repository: IndexedDbRepository }) {
   const t = useText();
+  const locale = useContext(LocaleContext);
   const [counts, setCounts] = useState<readonly CountRecord[]>();
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -461,9 +471,11 @@ function HistoryPage({ repository }: { repository: IndexedDbRepository }) {
       <p className="history-intro">{t("Saved on this device, newest first. Totals remain separate by currency.")}</p>
       <ul className="history-list" aria-label={t("Saved local counts")}> {counts.map((count) => <li key={count.id}>
         <article className="history-record-card">
+          <h3>{count.title || t("New count")}</h3>
           <CountTime record={count} className="history-record-date" />
           <SnapshotSubtotals record={count} className="history-subtotals" />
-          <a className="history-record-link" href={`/history/${encodeURIComponent(count.id)}`}>{t("View count")} {count.id}<span aria-hidden="true">→</span></a>
+          <a className="history-record-link" href={`/history/${encodeURIComponent(count.id)}`}
+            aria-label={`${t("View count")}: ${count.title || t("New count")}, ${formatCountTime(count.createdAt, locale)}`}>{t("View count")}<span aria-hidden="true">→</span></a>
         </article>
       </li>)}</ul>
     </> : <section className="history-empty-state" aria-labelledby="empty-history-title">
@@ -497,6 +509,7 @@ function CountDetailPage({ countId, repository }: {
     <a href="/history">{t("Return to history")}</a></Page>;
   if (record === null) return <Page title="Count not found"><a href="/history">{t("Return to history")}</a></Page>;
   return <Page title="Count details">
+    <h2>{record.title || t("New count")}</h2>
     <CountTime record={record} />
     {record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
       <h2>{snapshot.name} ({snapshot.code})</h2>
@@ -576,8 +589,15 @@ function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCa
   </dialog>;
 }
 
+function formatCountTime(timestamp: string, locale: Locale): string {
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? timestamp
+    : new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(date);
+}
+
 function CountTime({ record, className }: { record: CountRecord; className?: string }) {
-  return <time className={className} dateTime={record.createdAt}>{record.createdAt}</time>;
+  const locale = useContext(LocaleContext);
+  return <time className={className} dateTime={record.createdAt}>{formatCountTime(record.createdAt, locale)}</time>;
 }
 
 function SnapshotSubtotals({ record, className }: { record: CountRecord; className?: string }) {
@@ -694,15 +714,29 @@ function CountPage({ configurations, repository, state, onChange }: {
 }) {
   const t = useText();
   const { quantities: draft, note, message, invalidQuantityKeys } = state;
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [confirmation, setConfirmation] = useState<string>();
+  const [limitWarning, setLimitWarning] = useState<string>();
   const quantities = toQuantities(configurations, draft, false);
-  const snapshots = calculateCountSnapshots(configurations, quantities);
+  let rangeExceeded = false;
+  let snapshots;
+  try {
+    snapshots = calculateCountSnapshots(configurations, quantities);
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    rangeExceeded = true;
+    snapshots = calculateCountSnapshots(configurations, {});
+  }
 
   const clear = () => {
+    setConfirmation(undefined);
+    setLimitWarning(undefined);
     onChange({ quantities: {}, note: "", invalidQuantityKeys: new Set() });
   };
 
-  const save = async (event: FormEvent) => {
-    event.preventDefault();
+  const save = async (confirmDuplicate = false) => {
+    if (savingRef.current) return;
     const invalidKeys = new Set(configurations.flatMap((configuration) =>
       configuration.denominations.map((denomination) => `${configuration.id}:${denomination}`)
         .filter((key) => isInvalidQuantity(draft[key] ?? ""))));
@@ -711,31 +745,50 @@ function CountPage({ configurations, repository, state, onChange }: {
         message: "Quantities must be non-negative integers." });
       return;
     }
+    if (rangeExceeded) {
+      onChange({ ...state, invalidQuantityKeys: invalidKeys, message: "The count total exceeds the supported range." });
+      return;
+    }
     onChange({ ...state, invalidQuantityKeys: invalidKeys });
     try {
       const checked = toQuantities(configurations, draft, true);
-      await repository.saveCount({
+      const payload = {
         snapshots: calculateCountSnapshots(configurations, checked),
-        ...(note.trim() ? { note: note.trim() } : {}),
-      });
+        ...(note.trim() ? { title: note.trim() } : {}),
+      };
+      const fingerprint = JSON.stringify(payload);
+      if (!confirmDuplicate && fingerprint === state.lastSavedCount) {
+        setConfirmation(fingerprint);
+        return;
+      }
+      if (confirmDuplicate && confirmation !== fingerprint) return;
+      setConfirmation(undefined);
+      savingRef.current = true;
+      setSaving(true);
+      await repository.saveCount(payload);
       onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
-        message: "Count saved." }));
+        lastSavedCount: fingerprint, message: "Count saved." }));
     } catch (error) {
       onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
         message: error instanceof TypeError
         ? "Quantities must be non-negative integers."
         : "Could not save the count. Try again." }));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
-  return <Page title="New count"><form onSubmit={(event) => void save(event)} noValidate>
+  return <Page title="New count" className="count-page" heading={<input className="count-title-input"
+    aria-label={t("Count title")} placeholder={t("New count")} value={note}
+    onChange={(event) => { setConfirmation(undefined); onChange({ ...state, note: event.target.value }); }} />}><form onSubmit={(event) => { event.preventDefault(); void save(); }} noValidate>
     {configurations.map((configuration, currencyIndex) =>
       <fieldset className="currency-fieldset" key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
-      <p className="currency-total">{configuration.code} {t("total")}: <strong>
-        {configuration.symbol}{snapshots[currencyIndex].subtotal} {configuration.code}
+      <p className="currency-total"><strong>
+        {rangeExceeded ? "—" : `${configuration.symbol} ${snapshots[currencyIndex].subtotal.toLocaleString("en-US")} ${configuration.code}`}
       </strong></p>
-      {snapshots[currencyIndex].entries.map((entry) => {
+      {[...snapshots[currencyIndex].entries].sort((a, b) => b.denomination - a.denomination).map((entry) => {
         const key = `${configuration.id}:${entry.denomination}`;
         const subtotalId = `${key}-subtotal`;
         const subtotalDescriptionId = `${subtotalId}-description`;
@@ -744,39 +797,51 @@ function CountPage({ configurations, repository, state, onChange }: {
         return <div className="denomination-row" key={key}>
           <label className="denomination-value" htmlFor={key}>{entry.denomination}</label>
           <span className="row-operator" aria-hidden="true">×</span>
-          <input id={key} type="number" min="0" step="1" inputMode="numeric"
+          <input id={key} type="number" min="0" max="99999999" step="1" inputMode="numeric"
             aria-label={`${configuration.symbol}${entry.denomination} ${t("quantity")}`}
             aria-invalid={invalid ? true : undefined}
             aria-describedby={`${subtotalDescriptionId}${invalid ? ` ${errorId}` : ""}`}
             value={draft[key] ?? ""}
             onChange={(event) => {
               const value = event.target.value;
+              if (/^\d{9,}$/.test(value)) {
+                event.target.value = draft[key] ?? "";
+                setLimitWarning(key);
+                return;
+              }
+              setLimitWarning(undefined);
+              setConfirmation(undefined);
               onChange({ ...state, quantities: { ...draft, [key]: value },
                 invalidQuantityKeys: invalid && !isInvalidQuantity(value)
                   ? new Set([...invalidQuantityKeys].filter((item) => item !== key))
                   : invalidQuantityKeys });
             }} />
           <span className="row-operator" aria-hidden="true">=</span>
-          <span id={subtotalId} className="denomination-subtotal">{entry.total}</span>
+          <span id={subtotalId} className={`denomination-subtotal${String(entry.total).length > 8 ? " denomination-subtotal--long" : ""}`}>{rangeExceeded ? "—" : entry.total}</span>
           <span id={subtotalDescriptionId} className="visually-hidden">
             {t("Subtotal")}: {configuration.symbol}{entry.total} {configuration.code}
           </span>
+          {limitWarning === key && <span className="error" role="status">{t("Maximum 8 digits; the previous value was kept.")}</span>}
           {invalid && <span id={errorId} className="error">
-            {t("Enter a non-negative whole number within the safe integer range.")}
+            {t(Number(draft[key]) > 99999999
+              ? "Enter a whole number from 0 to 99999999."
+              : "Enter a non-negative whole number within the safe integer range.")}
           </span>}
         </div>;
       })}
     </fieldset>)}
-    <div className="field"><label htmlFor="count-note">{t("Note (optional)")}</label>
-      <input id="count-note" value={note}
-        onChange={(event) => onChange({ ...state, note: event.target.value })} />
-    </div>
+    {rangeExceeded && <p className="error" role="alert">{t("The count total exceeds the supported range.")}</p>}
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{t(message)}</p>}
     <div className="actions">
-      <button type="submit">{t("Save count")}</button>
+      <button type="submit" disabled={saving}>{t(saving ? "Saving…" : "Save count")}</button>
       <button type="button" className="secondary" onClick={clear}>{t("Clear unsaved count")}</button>
     </div>
+    {confirmation && <div role="group" aria-label={t("This count has already been saved. Save it again?")}>
+      <p>{t("This count has already been saved. Save it again?")}</p>
+      <button type="button" disabled={saving} onClick={() => void save(true)}>{t("Save again")}</button>
+      <button type="button" onClick={() => setConfirmation(undefined)}>{t("Cancel")}</button>
+    </div>}
   </form></Page>;
 }
 
@@ -792,13 +857,13 @@ function toQuantities(
       if (strict && isInvalidQuantity(value)) {
         throw new TypeError("Quantities must be non-negative integers");
       }
-      return [String(denomination), Number.isSafeInteger(quantity) && quantity >= 0 ? quantity : 0];
+      return [String(denomination), !isInvalidQuantity(value) && Number.isSafeInteger(quantity) && quantity >= 0 ? quantity : 0];
     })),
   ]));
 }
 
 function isInvalidQuantity(value: string): boolean {
-  return value !== "" && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)));
+  return value !== "" && (!/^\d{1,8}$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) > 99999999);
 }
 
 export function LocalSettingsErrorPage({ message }: { message: string }) {
@@ -824,12 +889,12 @@ function ReturnHomeLink() {
   return <a href="/">{t("Return home")}</a>;
 }
 
-function Page({ title, children, className }: {
-  title: string; children: React.ReactNode; className?: string;
+function Page({ title, children, className, heading }: {
+  title: string; children: React.ReactNode; className?: string; heading?: React.ReactNode;
 }) {
   const t = useText();
   return <section className={`card${className ? ` ${className}` : ""}`} aria-labelledby="page-title">
-    <h1 id="page-title">{t(title)}</h1>{children}
+    <h1 id="page-title" className={heading ? "visually-hidden" : undefined}>{t(title)}</h1>{heading}{children}
   </section>;
 }
 

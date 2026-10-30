@@ -88,10 +88,12 @@ describe("stored count routes", () => {
     const cards = list.querySelectorAll(".history-record-card");
     expect(cards).toHaveLength(2);
     expect(cards[0].querySelector("time")?.dateTime).toBe("2026-10-12T12:00:00.000Z");
+    expect(cards[0].querySelector("time")?.textContent).toBe(new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "short" }).format(new Date("2026-10-12T12:00:00.000Z")));
     expect(cards[0].querySelectorAll(".history-subtotals li")).toHaveLength(1);
     expect(cards[1].querySelectorAll(".history-subtotals li")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "View count count-2" }).getAttribute("href"))
-      .toBe("/history/count-2");
+    const link = within(cards[0] as HTMLElement).getByRole("link", { name: /View count/ });
+    expect(link.getAttribute("href")).toBe("/history/count-2");
+    expect(link.textContent).not.toContain("count-2");
   });
 
   it("renders the approved empty History state with a count action", async () => {
@@ -120,7 +122,8 @@ describe("stored count routes", () => {
     expect(screen.getByText("Subtotal: $13 USD")).toBeTruthy();
     expect(screen.getByText("Subtotal: €8 EUR")).toBeTruthy();
     expect(screen.getByText("Updated current note")).toBeTruthy();
-    expect(screen.getByText("2026-10-12T10:00:00.000Z").tagName).toBe("TIME");
+    expect(screen.getByRole("heading", { name: "New count" })).toBeTruthy();
+    expect(screen.getByText(new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "short" }).format(new Date("2026-10-12T10:00:00.000Z"))).tagName).toBe("TIME");
     expect(screen.queryByText(/JPY|1000/)).toBeNull();
     expectNeutralLanguage();
   });

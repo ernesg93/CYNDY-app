@@ -13,11 +13,13 @@ export interface CountRecord {
   readonly id: string;
   readonly createdAt: string;
   readonly snapshots: readonly CurrencyCountSnapshot[];
+  readonly title?: string;
   readonly note?: string;
 }
 
 export interface SaveCountInput {
   readonly snapshots: readonly CurrencyCountSnapshot[];
+  readonly title?: string;
   readonly note?: string;
 }
 
@@ -77,6 +79,7 @@ export class IndexedDbRepository implements CountRepository {
       id,
       createdAt: this.now().toISOString(),
       snapshots: structuredClone(input.snapshots),
+      ...(input.title === undefined ? {} : { title: input.title }),
       ...(input.note === undefined ? {} : { note: input.note }),
     };
     const transaction = (await this.open()).transaction(COUNTS_STORE, "readwrite");

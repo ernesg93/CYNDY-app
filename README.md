@@ -4,12 +4,12 @@ CYNDY is a clean-room, Android-first money counter designed to work offline afte
 
 ## Project status
 
-Repository governance and the static React/TypeScript foundation are established. Domain tests cover configuration validation and independent per-currency totals; local persistence and interactive counting follow in later work units.
+CYNDY is an Android-first, offline-capable MVP with device-local currency settings, counting, history, receipts, and progressive web app support. The first successful load requires an internet connection.
 
 ## Product boundaries
 
 - Counts are independent records, not register closures or shift handoffs.
-- V1 has no authentication, cloud sync, backup, export/import, conversion, or reconciliation.
+- V1 has no authentication, cloud sync, backup, export/import, conversion, or reconciliation. Clearing site data or losing the device can permanently remove local counts and settings.
 - Real user data, production exports, credentials, and secrets are prohibited from the repository.
 - Test fixtures must be synthetic.
 
@@ -32,7 +32,7 @@ The build requires no environment variables or server runtime. Vite writes the p
 
 ## Deployment
 
-The app is available at `https://cyndy-app.pages.dev`. Cloudflare Pages builds from `main` with `app` as the root directory, `npm run build` as the build command, and `dist` as the output directory. The deployment requires no environment variables, Pages Functions, Workers, bindings, deployment tokens, or vendor storage. Any replacement host only needs HTTPS, static-file serving, and an SPA fallback to `index.html`.
+The app is available at `https://cyndy-app.pages.dev`. Cloudflare Web Analytics is enabled and can receive page navigation and performance information when online; offline use is not a complete analytics source. Cloudflare Pages builds from `main` with `app` as the root directory, `npm run build` as the build command, and `dist` as the output directory. The deployment requires no environment variables, Pages Functions, Workers, bindings, deployment tokens, or vendor storage. Any replacement host only needs HTTPS, static-file serving, and an SPA fallback to `index.html`.
 
 Deployment and public-repository settings are user-owned actions. See [the pre-release checklist](docs/pre-release-checklist.md) before publication.
 

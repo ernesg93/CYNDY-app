@@ -422,6 +422,7 @@ function Dashboard({ repository, onReset }: {
     <section className="dashboard-section" aria-labelledby="latest-count-title"><h2 id="latest-count-title">{t("Latest count")}</h2>
     {data.latest ? <article className="dashboard-card">
       <CountTime record={data.latest} />
+      <strong>{data.latest.title || t("New count")}</strong>
       <SnapshotSubtotals record={data.latest} />
       <a href={`/history/${encodeURIComponent(data.latest.id)}`}>{t("View latest count")}</a>
     </article> : <p>{t("No saved counts yet.")}</p>}</section>

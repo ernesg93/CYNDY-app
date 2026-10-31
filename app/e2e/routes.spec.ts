@@ -80,8 +80,88 @@ test("mobile header keeps controls on one row with readable dark colors", async 
   expect(Math.abs(boxes[0]!.y - boxes[2]!.y)).toBeLessThan(2);
   expect(boxes[1]!.x).toBeGreaterThanOrEqual(boxes[0]!.x + boxes[0]!.width);
   expect(boxes[1]!.x + boxes[1]!.width).toBeLessThanOrEqual(boxes[2]!.x);
-  await expect(header.locator(".home-control")).toHaveCSS("color", "rgb(243, 247, 244)");
-  await expect(header.locator(".brand")).toHaveCSS("color", "rgb(243, 247, 244)");
+  const home = header.locator(".home-control");
+  const brand = header.locator(".brand");
+  await expect(home).toHaveCSS("color", "rgb(247, 237, 224)");
+  await expect(brand).toHaveCSS("color", "rgb(255, 185, 172)");
+  for (const [element, background] of [[home, home], [brand, header]] as const) {
+    const foregroundColor = await element.evaluate((node) => getComputedStyle(node).color);
+    const backgroundColor = await background.evaluate((node) => getComputedStyle(node).backgroundColor);
+    expect(contrastRatio(foregroundColor, backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+function contrastRatio(foreground: string, background: string) {
+  const luminance = (color: string) => {
+    const channels = color.match(/\d+/g)!.slice(0, 3).map(Number).map((value) => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`offline-ready status uses readable ledger colors in ${theme}`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("cyndy.theme", value), theme);
+    await page.goto("/history");
+    const status = page.locator("#offline-ready");
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(status).toContainText("Offline access is ready.");
+    const color = theme === "light" ? "rgb(41, 39, 33)" : "rgb(247, 237, 224)";
+    const background = theme === "light" ? "rgb(255, 253, 248)" : "rgb(48, 42, 37)";
+    await expect(status).toHaveCSS("color", color);
+    await expect(status).toHaveCSS("background-color", background);
+    expect(contrastRatio(color, background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test(`empty history symbol uses readable ledger colors in ${theme}`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("cyndy.theme", value), theme);
+    await page.goto("/history");
+    await expect(page.getByRole("heading", { name: "No saved counts yet" })).toBeVisible();
+    const symbol = page.locator(".history-empty-symbol");
+    const color = theme === "light" ? "rgb(132, 56, 53)" : "rgb(255, 185, 172)";
+    const background = theme === "light" ? "rgb(255, 253, 248)" : "rgb(48, 42, 37)";
+    await expect(symbol).toHaveCSS("color", color);
+    await expect(symbol).toHaveCSS("background-color", background);
+    expect(contrastRatio(color, background)).toBeGreaterThanOrEqual(4.5);
+    await expect(page.getByRole("link", { name: "Start a count" })).toHaveAttribute("href", "/count/new");
+  });
+}
+
+test("Libro de caja surfaces retain the approved mobile palette on dashboard, history and settings", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await configureCountCurrencies(page);
+  await page.getByLabel("Count title").fill("Morning cash");
+  await page.getByLabel("$1 quantity").fill("3");
+  await page.getByLabel("€2 quantity").fill("4");
+  await page.getByRole("button", { name: "Save count" }).click();
+  await expect(page.getByText("Count saved.")).toBeVisible();
+
+  for (const theme of ["light", "dark"] as const) {
+    await page.evaluate((value) => localStorage.setItem("cyndy.theme", value), theme);
+    for (const [path, heading] of [["/", "Dashboard"], ["/history", "History"], ["/settings", "Settings"]]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      await expect(page.locator(".card")).toHaveCSS("background-color", theme === "light" ? "rgb(251, 247, 239)" : "rgb(33, 30, 27)");
+      await expect(page.locator(".app-header")).toHaveCSS("border-bottom-style", "double");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (path === "/") {
+        await expect(page.locator(".dashboard-card").first()).toContainText("Morning cash");
+        await expect(page.locator(".dashboard-card").first()).toContainText("$3 USD");
+        await expect(page.locator(".dashboard-card").first()).toContainText("€8 EUR");
+      } else if (path === "/history") {
+        await expect(page.locator(".history-record-card")).toContainText("Morning cash");
+        await expect(page.locator(".history-record-card")).toHaveCSS("border-bottom-style", "solid");
+      } else {
+        await expect(page.locator(".settings-page fieldset")).toHaveCount(2);
+        await expect(page.locator(".settings-page fieldset").first()).toHaveCSS("background-color", theme === "light" ? "rgb(255, 253, 248)" : "rgb(48, 42, 37)");
+      }
+    }
+  }
 });
 
 test("mobile count rows keep denomination, quantity and subtotal on one line", async ({ page }) => {

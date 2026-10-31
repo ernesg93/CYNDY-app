@@ -56,6 +56,7 @@ describe("stored count routes", () => {
 
     await screen.findByRole("heading", { name: "Latest count" });
     expect(screen.getByText("$6 USD")).toBeTruthy();
+    expect(screen.getByText("New count", { selector: ".dashboard-card strong" })).toBeTruthy();
     expect(screen.getByText("USD: 2 counts")).toBeTruthy();
     expect(screen.getByText("EUR: 1 count")).toBeTruthy();
     expect(screen.queryByText(/JPY/)).toBeNull();

@@ -11,8 +11,8 @@ S3. "perfecto. implementemos el plan"
 - [x] T1 [S1-S3] Verify candidate and safe upgrade with isolated synthetic data; route: inline; evidence: old note and new title preserved after service-worker upgrade and offline reopen; commit: not applicable.
 - [x] T2 [S1-S3] Prepare release documentation, version proposal, rollback and security evidence; route: inline; evidence: README, checklist and release-operation; propose existing 0.1.0; commit: b210830.
 - [x] T3 [S1-S3] Review candidate, run final checks and prepare reviewable commits preserving unrelated changes; route: inline; delivery: tracker b210830 and child 1810801; independent verification passed; commit: 1810801.
-- [!] T4 [S1-S3] Prepare authorized push and PRs; route: inline; issue #52 approved; tracker PR #53 and child PR #54 opened; blocked: separate merge and production authorization.
-- [ ] T5 [S1-S3] Verify deployment and propose safe cleanup; route: inline; commit: pending.
+- [x] T4 [S1-S3] Integrate authorized release chain; route: inline; issue #52 closed, child #54 and tracker #53 merged; main merge 50944b80c5033e1cef8841023a009f765e2a43e1.
+- [x] T5 [S1-S3] Verify deployment and propose safe cleanup; route: inline; production Android update confirmed; two merged remote branches and four prunable worktree registrations identified; no deletion authorized.
 
 ## Log
 L1. "perfecto. implementemos el plan"
@@ -27,4 +27,7 @@ L9. User confirmed Android synthetic test: "listo, se actualizo" and "si" to old
 L10. User authorized pushing branches and opening PRs: "vamos con todo !!!! xd". Issue-first policy requires an approved issue; previous issues did not cover this release. Merge remains separately gated.
 L11. "Autorizo crear el issue y aplicar status:approved"; issue #52 created and verified with that label. Local branches renamed to feat/cyndy-first-release and feat/cyndy-first-release-app to satisfy the PR branch convention.
 L12. User selected: "Cerrarlo al integrar la propuesta final". Tracker #53 is draft against main and closes #52; child #54 references #52 and targets the tracker. No merge or production deployment authorized.
-L13. Initial PR checks: tracker #53 CodeQL and Cloudflare Pages passed; child #54 Cloudflare Pages passed. Branch protection and review approval still need confirmation before integration; a later evidence commit triggers fresh checks.
+L13. Initial PR checks: tracker #53 CodeQL and Cloudflare Pages passed; child #54 Cloudflare Pages passed. Branch protection requires zero approving reviews and no specific status checks; fresh checks are required after integration.
+L14. "autorizado" — user authorized merging #54 into tracker and, if fresh checks pass, marking #53 ready and merging to main for production. #54 merged as 0e57437; fresh CodeQL and Cloudflare checks passed; #53 merged as 50944b80c5033e1cef8841023a009f765e2a43e1 and #52 closed.
+L15. Cloudflare Pages and CodeQL checks for 50944b80c5033e1cef8841023a009f765e2a43e1 succeeded. Production synthetic Chromium Pixel 7 emulation saved a titled count, displayed grouped total, and reopened history offline. A local-vs-cloud build asset-name equality check was stopped because environment-dependent hashes differed; deployed behavior and commit-bound checks supplied alternative evidence. Four old worktree metadata entries are prunable; no cleanup performed.
+L16. "confirmado en android" — user confirmed production update, existing counts and offline history. Temporary tunnel and preview servers stopped. After git fetch, both release remote branches are merged; four old worktree registrations are prunable. Cleanup and changes to pre-existing .atl/skill-registry.md require separate decisions. Local feature task record contains post-merge evidence and is not yet committed.

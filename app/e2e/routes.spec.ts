@@ -45,7 +45,7 @@ test("a wrapping currency legend does not overlap its total at wide layouts", as
   const firstFieldset = page.locator(".currency-fieldset").first();
   const legend = firstFieldset.locator(":scope > legend");
   const total = firstFieldset.locator(":scope > .currency-total");
-  await expect(total).toHaveCSS("position", "static");
+  await expect(total).toHaveCSS("position", "sticky");
 
   const [legendBox, totalBox] = await Promise.all([legend.boundingBox(), total.boundingBox()]);
   expect(legendBox).not.toBeNull();
@@ -220,6 +220,86 @@ test("large quantities remain visible without overflowing their mobile row", asy
       overflow: document.documentElement.scrollWidth > innerWidth };
   });
   expect(fit).toEqual({ inputFits: true, subtotalFits: true, overflow: false });
+});
+
+test("ledger rows align numeric values and accommodate extreme subtotals on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/onboarding");
+  await page.getByLabel("Currency name").fill("Peso");
+  await page.getByLabel("Symbol").fill("$");
+  await page.getByLabel("Currency code").fill("CUP");
+  await page.getByLabel("Denominations (comma separated)").fill("20000, 1");
+  await page.getByRole("button", { name: "Save configuration" }).click();
+  await page.goto("/count/new");
+  const input = page.getByLabel("$20000 quantity");
+  await input.fill("99999999");
+  await expect(input).toHaveValue("99999999");
+  await input.fill("999999999");
+  await expect(input).toHaveValue("99999999");
+  await expect(page.getByText("Maximum 8 digits; the previous value was kept.")).toBeVisible();
+  const row = input.locator("..");
+  await expect(row.locator(".denomination-value")).toHaveText("20000");
+  await expect(row.locator(".denomination-subtotal")).toHaveText("1999999980000");
+  await expect(input).toHaveCSS("text-align", "right");
+  await expect(row.locator(".denomination-value")).toHaveCSS("justify-content", "flex-end");
+  await expect(row.locator(".denomination-subtotal")).toHaveCSS("justify-content", "flex-end");
+  await expect(row.locator(".denomination-value")).toHaveCSS("background-color", "rgb(48, 42, 37)");
+  const fit = await row.evaluate((node) => [...node.querySelectorAll<HTMLElement>(".denomination-value, input, .denomination-subtotal")].every((item) => item.scrollWidth <= item.clientWidth && item.scrollHeight <= item.clientHeight));
+  expect(fit).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("each currency total remains sticky within its own fieldset", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 600 });
+  await configureCountCurrencies(page);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByLabel("Denominations (comma separated)").nth(1).fill(Array.from({ length: 14 }, (_, i) => i + 1).join(", "));
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await page.getByRole("link", { name: "Count", exact: true }).click();
+  for (const [index, symbol] of [[0, "$"], [1, "€"]] as const) {
+    const field = page.locator(".currency-fieldset").nth(index);
+    await field.getByLabel(`${symbol}7 quantity`).evaluate((node) => {
+      window.scrollTo(0, window.scrollY + node.getBoundingClientRect().top - 300);
+    });
+    const position = await field.evaluate((node) => {
+      const fieldBox = node.getBoundingClientRect();
+      const total = node.querySelector<HTMLElement>(".currency-total")!;
+      const box = total.getBoundingClientRect();
+      return { position: getComputedStyle(total).position, top: box.top, bottom: box.bottom, fieldBottom: fieldBox.bottom };
+    });
+    expect(position.position).toBe("sticky");
+    expect(position.top).toBeGreaterThanOrEqual(0);
+    expect(position.top).toBeLessThan(20);
+    expect(position.bottom).toBeLessThanOrEqual(position.fieldBottom);
+  }
+});
+
+test("duplicate alert is modal and supports cancel, Escape and confirmation", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await configureCountCurrencies(page);
+  await page.getByLabel("$1 quantity").fill("2");
+  const save = page.getByRole("button", { name: "Save count" });
+  await save.click();
+  await expect(page.getByText("Count saved.")).toBeVisible();
+  const before = await snapshotLocalData(page);
+  const dialog = page.getByRole("alertdialog", { name: "This count has already been saved. Save it again?" });
+  await save.click();
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate((node: HTMLDialogElement) => node.matches(":modal"))).toBe(true);
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(save).toBeFocused();
+  expect(await snapshotLocalData(page)).toEqual(before);
+  await save.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(save).toBeFocused();
+  expect(await snapshotLocalData(page)).toEqual(before);
+  await save.click();
+  await dialog.getByRole("button", { name: "Save again" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(async () => JSON.stringify(await snapshotLocalData(page)) !== JSON.stringify(before)).toBe(true);
 });
 
 test("compact currency totals stay fieldset-bound and clear keyboard focus at 200% zoom", async ({ page }) => {

@@ -377,6 +377,16 @@ button, .button { border:1px solid var(--red); border-radius:0; background:var(-
 .settings-actions button:only-child, :root[data-theme="dark"] .settings-actions button:only-child { color:var(--on-red); background:var(--red); border-color:var(--red); }
 .dashboard-reset-button, :root[data-theme="dark"] .dashboard-reset-button { color:var(--red); background:transparent; border-color:var(--red); }
 .confirmation, :root[data-theme="dark"] .confirmation { color:var(--ink); background:var(--paper); border-color:var(--ink); border-radius:0; }
+/* Count ledger follows the same paper and ink as the approved direction. */
+.denomination-value, .denomination-subtotal,
+:root[data-theme="dark"] .denomination-value, :root[data-theme="dark"] .denomination-subtotal,
+.denomination-row input, :root[data-theme="dark"] .denomination-row input,
+.count-title-input, :root[data-theme="dark"] .count-title-input {
+  color:var(--ink); background:var(--sheet); border-color:var(--rule); border-radius:0;
+}
+.denomination-subtotal { overflow-wrap:anywhere; text-align:right; }
+.currency-total, :root[data-theme="dark"] .currency-total { position:sticky; z-index:1; inset-block-start:.5rem; color:var(--ink); background:var(--paper); border-color:var(--ink); }
+.currency-fieldset .denomination-row input:focus-visible { scroll-margin-block-start:7rem; }
 @media print {
   .skip-link,
   .app-header,

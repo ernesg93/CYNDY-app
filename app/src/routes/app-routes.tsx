@@ -718,6 +718,7 @@ function CountPage({ configurations, repository, state, onChange }: {
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [confirmation, setConfirmation] = useState<string>();
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const [limitWarning, setLimitWarning] = useState<string>();
   const quantities = toQuantities(configurations, draft, false);
   let rangeExceeded = false;
@@ -835,14 +836,15 @@ function CountPage({ configurations, repository, state, onChange }: {
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{t(message)}</p>}
     <div className="actions">
-      <button type="submit" disabled={saving}>{t(saving ? "Saving…" : "Save count")}</button>
+      <button ref={saveButtonRef} type="submit" disabled={saving}>{t(saving ? "Saving…" : "Save count")}</button>
       <button type="button" className="secondary" onClick={clear}>{t("Clear unsaved count")}</button>
     </div>
-    {confirmation && <div role="group" aria-label={t("This count has already been saved. Save it again?")}>
-      <p>{t("This count has already been saved. Save it again?")}</p>
-      <button type="button" disabled={saving} onClick={() => void save(true)}>{t("Save again")}</button>
-      <button type="button" onClick={() => setConfirmation(undefined)}>{t("Cancel")}</button>
-    </div>}
+    {confirmation && <ConfirmationPanel
+      title="This count has already been saved. Save it again?"
+      description="This count has already been saved. Save it again?"
+      cancelLabel="Cancel" confirmLabel="Save again"
+      onCancel={() => { setConfirmation(undefined); setTimeout(() => saveButtonRef.current?.focus()); }}
+      onConfirm={() => void save(true)} />}
   </form></Page>;
 }
 

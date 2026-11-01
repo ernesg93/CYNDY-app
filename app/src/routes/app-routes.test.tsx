@@ -141,8 +141,12 @@ describe("duplicate count protection", () => {
     finish();
     await screen.findByText("Count saved.");
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
-    expect(screen.getByText("This count has already been saved. Save it again?")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const dialog = screen.getByRole("alertdialog", { name: "This count has already been saved. Save it again?" });
+    expect(dialog.hasAttribute("open")).toBe(true);
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save count" })));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(store.saveCount).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
     fireEvent.click(screen.getByRole("button", { name: "Save again" }));

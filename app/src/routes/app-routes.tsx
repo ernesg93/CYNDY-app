@@ -105,6 +105,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Save count": "Guardar conteo",
   "Saving…": "Guardando…",
   "This count has already been saved. Save it again?": "Este conteo ya se guardó. ¿Quieres guardarlo nuevamente?",
+  "Saving again creates a separate copy.": "Al guardarlo nuevamente se crea una copia independiente.",
   "Save again": "Guardar nuevamente",
   "Cancel": "Cancelar",
   "Clear unsaved count": "Limpiar conteo sin guardar",
@@ -822,7 +823,7 @@ function CountPage({ configurations, repository, state, onChange }: {
     </div>
     {confirmation && <ConfirmationPanel
       title="This count has already been saved. Save it again?"
-      description="This count has already been saved. Save it again?"
+      description="Saving again creates a separate copy."
       cancelLabel="Cancel" confirmLabel="Save again"
       onCancel={() => { setConfirmation(undefined); setTimeout(() => saveButtonRef.current?.focus()); }}
       onConfirm={() => void save(true)} />}

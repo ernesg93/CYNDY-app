@@ -38,6 +38,65 @@ async function configureCountCurrencies(page: Page, firstCurrencyName = "US doll
   await page.goto("/count/new");
 }
 
+for (const [locale, heading, action, navigation, history] of [
+  ["en", "Count details", "Print or save", "CYNDY navigation", "History"],
+  ["es", "Detalles del conteo", "Imprimir o guardar", "Navegación de CYNDY", "Historial"],
+] as const) {
+  test(`legacy detail prints historical data only on request (${locale})`, async ({ page }) => {
+    await configureCountCurrencies(page);
+    await page.getByLabel("$1 quantity").fill("3");
+    await page.getByLabel("€2 quantity").fill("4");
+    await page.getByRole("button", { name: "Save count" }).click();
+    await expect(page.getByText("Count saved.")).toBeVisible();
+    const id = await page.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open("cyndy");
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = database.transaction("counts", "readwrite");
+      const store = transaction.objectStore("counts");
+      const count = await new Promise<{ id: string; note?: string }>((resolve, reject) => {
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result[0]);
+        request.onerror = () => reject(request.error);
+      });
+      store.put({ ...count, note: "Historical note\nSecond line" });
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+      database.close();
+      return count.id;
+    });
+    const before = await snapshotLocalData(page);
+    await page.addInitScript((language) => {
+      localStorage.setItem("cyndy.locale", language);
+      (window as unknown as { printCalls: number }).printCalls = 0;
+      window.print = () => { (window as unknown as { printCalls: number }).printCalls++; };
+    }, locale);
+    await page.goto(`/history/${id}/receipt`);
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(page.getByText("Historical note Second line")).toBeVisible();
+    await expect(page.getByText("$1 × 3 = $3")).toBeVisible();
+    await expect(page.getByText("€2 × 4 = €8")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Return to history|Volver al historial/ })).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(0);
+    await page.getByRole("button", { name: action }).click();
+    expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(1);
+    await page.emulateMedia({ media: "print" });
+    await expect(page.getByText("Historical note Second line")).toBeVisible();
+    await expect(page.getByText("$1 × 3 = $3")).toBeVisible();
+    await expect(page.getByRole("button", { name: action })).toBeHidden();
+    await expect(page.locator(".bottom-nav")).toBeHidden();
+    expect(await page.locator(".detail-note").evaluate((node) => getComputedStyle(node).color)).toBe("rgb(0, 0, 0)");
+    expect(await snapshotLocalData(page)).toEqual(before);
+    await page.emulateMedia({ media: "screen" });
+    await page.getByRole("navigation", { name: navigation }).getByRole("link", { name: history }).click();
+    await expect(page.getByRole("heading", { name: history, exact: true })).toBeVisible();
+  });
+}
+
 test("a wrapping currency legend does not overlap its total at wide layouts", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 720 });
   await configureCountCurrencies(page, "United States dollar cash drawer primary operating currency");
@@ -45,7 +104,7 @@ test("a wrapping currency legend does not overlap its total at wide layouts", as
   const firstFieldset = page.locator(".currency-fieldset").first();
   const legend = firstFieldset.locator(":scope > legend");
   const total = firstFieldset.locator(":scope > .currency-total");
-  await expect(total).toHaveCSS("position", "static");
+  await expect(total).toHaveCSS("position", "sticky");
 
   const [legendBox, totalBox] = await Promise.all([legend.boundingBox(), total.boundingBox()]);
   expect(legendBox).not.toBeNull();
@@ -80,8 +139,88 @@ test("mobile header keeps controls on one row with readable dark colors", async 
   expect(Math.abs(boxes[0]!.y - boxes[2]!.y)).toBeLessThan(2);
   expect(boxes[1]!.x).toBeGreaterThanOrEqual(boxes[0]!.x + boxes[0]!.width);
   expect(boxes[1]!.x + boxes[1]!.width).toBeLessThanOrEqual(boxes[2]!.x);
-  await expect(header.locator(".home-control")).toHaveCSS("color", "rgb(243, 247, 244)");
-  await expect(header.locator(".brand")).toHaveCSS("color", "rgb(243, 247, 244)");
+  const home = header.locator(".home-control");
+  const brand = header.locator(".brand");
+  await expect(home).toHaveCSS("color", "rgb(247, 237, 224)");
+  await expect(brand).toHaveCSS("color", "rgb(255, 185, 172)");
+  for (const [element, background] of [[home, home], [brand, header]] as const) {
+    const foregroundColor = await element.evaluate((node) => getComputedStyle(node).color);
+    const backgroundColor = await background.evaluate((node) => getComputedStyle(node).backgroundColor);
+    expect(contrastRatio(foregroundColor, backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
+function contrastRatio(foreground: string, background: string) {
+  const luminance = (color: string) => {
+    const channels = color.match(/\d+/g)!.slice(0, 3).map(Number).map((value) => {
+      const channel = value / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
+for (const theme of ["light", "dark"] as const) {
+  test(`offline-ready status uses readable ledger colors in ${theme}`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("cyndy.theme", value), theme);
+    await page.goto("/history");
+    const status = page.locator("#offline-ready");
+    await expect(status).toBeVisible();
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(status).toContainText("Offline access is ready.");
+    const color = theme === "light" ? "rgb(41, 39, 33)" : "rgb(247, 237, 224)";
+    const background = theme === "light" ? "rgb(255, 253, 248)" : "rgb(48, 42, 37)";
+    await expect(status).toHaveCSS("color", color);
+    await expect(status).toHaveCSS("background-color", background);
+    expect(contrastRatio(color, background)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  test(`empty history symbol uses readable ledger colors in ${theme}`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("cyndy.theme", value), theme);
+    await page.goto("/history");
+    await expect(page.getByRole("heading", { name: "No saved counts yet" })).toBeVisible();
+    const symbol = page.locator(".history-empty-symbol");
+    const color = theme === "light" ? "rgb(132, 56, 53)" : "rgb(255, 185, 172)";
+    const background = theme === "light" ? "rgb(255, 253, 248)" : "rgb(48, 42, 37)";
+    await expect(symbol).toHaveCSS("color", color);
+    await expect(symbol).toHaveCSS("background-color", background);
+    expect(contrastRatio(color, background)).toBeGreaterThanOrEqual(4.5);
+    await expect(page.getByRole("link", { name: "Start a count" })).toHaveAttribute("href", "/count/new");
+  });
+}
+
+test("Libro de caja surfaces retain the approved mobile palette on dashboard, history and settings", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await configureCountCurrencies(page);
+  await page.getByLabel("Count title").fill("Morning cash");
+  await page.getByLabel("$1 quantity").fill("3");
+  await page.getByLabel("€2 quantity").fill("4");
+  await page.getByRole("button", { name: "Save count" }).click();
+  await expect(page.getByText("Count saved.")).toBeVisible();
+
+  for (const theme of ["light", "dark"] as const) {
+    await page.evaluate((value) => localStorage.setItem("cyndy.theme", value), theme);
+    for (const [path, heading] of [["/", "Dashboard"], ["/history", "History"], ["/settings", "Settings"]]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      await expect(page.locator(".card")).toHaveCSS("background-color", theme === "light" ? "rgb(251, 247, 239)" : "rgb(33, 30, 27)");
+      await expect(page.locator(".app-header")).toHaveCSS("border-bottom-style", "double");
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (path === "/") {
+        await expect(page.locator(".dashboard-card").first()).toContainText("Morning cash");
+        await expect(page.locator(".dashboard-card").first()).toContainText("$3 USD");
+        await expect(page.locator(".dashboard-card").first()).toContainText("€8 EUR");
+      } else if (path === "/history") {
+        await expect(page.locator(".history-record-card")).toContainText("Morning cash");
+        await expect(page.locator(".history-record-card")).toHaveCSS("border-bottom-style", "solid");
+      } else {
+        await expect(page.locator(".settings-page fieldset")).toHaveCount(2);
+        await expect(page.locator(".settings-page fieldset").first()).toHaveCSS("background-color", theme === "light" ? "rgb(255, 253, 248)" : "rgb(48, 42, 37)");
+      }
+    }
+  }
 });
 
 test("mobile count rows keep denomination, quantity and subtotal on one line", async ({ page }) => {
@@ -140,6 +279,86 @@ test("large quantities remain visible without overflowing their mobile row", asy
       overflow: document.documentElement.scrollWidth > innerWidth };
   });
   expect(fit).toEqual({ inputFits: true, subtotalFits: true, overflow: false });
+});
+
+test("ledger rows align numeric values and accommodate extreme subtotals on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto("/onboarding");
+  await page.getByLabel("Currency name").fill("Peso");
+  await page.getByLabel("Symbol").fill("$");
+  await page.getByLabel("Currency code").fill("CUP");
+  await page.getByLabel("Denominations (comma separated)").fill("20000, 1");
+  await page.getByRole("button", { name: "Save configuration" }).click();
+  await page.goto("/count/new");
+  const input = page.getByLabel("$20000 quantity");
+  await input.fill("99999999");
+  await expect(input).toHaveValue("99999999");
+  await input.fill("999999999");
+  await expect(input).toHaveValue("99999999");
+  await expect(page.getByText("Maximum 8 digits; the previous value was kept.")).toBeVisible();
+  const row = input.locator("..");
+  await expect(row.locator(".denomination-value")).toHaveText("20000");
+  await expect(row.locator(".denomination-subtotal")).toHaveText("1999999980000");
+  await expect(input).toHaveCSS("text-align", "right");
+  await expect(row.locator(".denomination-value")).toHaveCSS("justify-content", "flex-end");
+  await expect(row.locator(".denomination-subtotal")).toHaveCSS("justify-content", "flex-end");
+  await expect(row.locator(".denomination-value")).toHaveCSS("background-color", "rgb(48, 42, 37)");
+  const fit = await row.evaluate((node) => [...node.querySelectorAll<HTMLElement>(".denomination-value, input, .denomination-subtotal")].every((item) => item.scrollWidth <= item.clientWidth && item.scrollHeight <= item.clientHeight));
+  expect(fit).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("each currency total remains sticky within its own fieldset", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 600 });
+  await configureCountCurrencies(page);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByLabel("Denominations (comma separated)").nth(1).fill(Array.from({ length: 14 }, (_, i) => i + 1).join(", "));
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await page.getByRole("link", { name: "Count", exact: true }).click();
+  for (const [index, symbol] of [[0, "$"], [1, "€"]] as const) {
+    const field = page.locator(".currency-fieldset").nth(index);
+    await field.getByLabel(`${symbol}7 quantity`).evaluate((node) => {
+      window.scrollTo(0, window.scrollY + node.getBoundingClientRect().top - 300);
+    });
+    const position = await field.evaluate((node) => {
+      const fieldBox = node.getBoundingClientRect();
+      const total = node.querySelector<HTMLElement>(".currency-total")!;
+      const box = total.getBoundingClientRect();
+      return { position: getComputedStyle(total).position, top: box.top, bottom: box.bottom, fieldBottom: fieldBox.bottom };
+    });
+    expect(position.position).toBe("sticky");
+    expect(position.top).toBeGreaterThanOrEqual(0);
+    expect(position.top).toBeLessThan(20);
+    expect(position.bottom).toBeLessThanOrEqual(position.fieldBottom);
+  }
+});
+
+test("duplicate alert is modal and supports cancel, Escape and confirmation", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await configureCountCurrencies(page);
+  await page.getByLabel("$1 quantity").fill("2");
+  const save = page.getByRole("button", { name: "Save count" });
+  await save.click();
+  await expect(page.getByText("Count saved.")).toBeVisible();
+  const before = await snapshotLocalData(page);
+  const dialog = page.getByRole("alertdialog", { name: "This count has already been saved. Save it again?" });
+  await save.click();
+  await expect(dialog).toBeVisible();
+  expect(await dialog.evaluate((node: HTMLDialogElement) => node.matches(":modal"))).toBe(true);
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(save).toBeFocused();
+  expect(await snapshotLocalData(page)).toEqual(before);
+  await save.click();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(save).toBeFocused();
+  expect(await snapshotLocalData(page)).toEqual(before);
+  await save.click();
+  await dialog.getByRole("button", { name: "Save again" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(async () => JSON.stringify(await snapshotLocalData(page)) !== JSON.stringify(before)).toBe(true);
 });
 
 test("compact currency totals stay fieldset-bound and clear keyboard focus at 200% zoom", async ({ page }) => {

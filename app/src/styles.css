@@ -337,7 +337,69 @@ button.secondary {
   .header-actions { gap:4px; }
   #offline-ready { margin:0; padding:.4rem .65rem; font-size:.8rem; line-height:1.3; }
 }
+/* Libro de caja: warm paper, ruled journal and ink in both themes. */
+:root { --paper:#fbf7ef; --sheet:#fffdf8; --ink:#292721; --muted:#5f5b52; --rule:#bdb19e; --red:#843835; --on-red:#fff; }
+:root[data-theme="dark"] { --paper:#211e1b; --sheet:#302a25; --ink:#f7ede0; --muted:#d1c2b2; --rule:#796d60; --red:#ffb9ac; --on-red:#321b19; }
+:root, :root[data-theme="dark"], :root[data-theme="dark"] body { color:var(--ink); background:var(--paper); }
+body { font-family:Georgia, "Times New Roman", serif; }
+.app-header, :root[data-theme="light"] .app-header { background:var(--paper); border-bottom:3px double var(--ink); }
+.app-header .brand, :root[data-theme="light"] .app-header .brand, :root[data-theme="dark"] .app-header .brand { color:var(--red); font-family:system-ui,sans-serif; letter-spacing:.12em; }
+.brand span { background:transparent; color:var(--red); border:2px solid currentColor; border-radius:4px; }
+.header-control, :root[data-theme="light"] .header-control, :root[data-theme="dark"] .app-header .home-control { color:var(--ink); background:var(--sheet); border:1px solid var(--rule); border-radius:0; }
+.bottom-nav, :root[data-theme="light"] .bottom-nav { background:var(--paper); border-color:var(--rule); font-family:system-ui,sans-serif; }
+.bottom-nav a, :root[data-theme="light"] .bottom-nav a { color:var(--muted); }
+.bottom-nav a[aria-current="page"], :root[data-theme="light"] .bottom-nav a[aria-current="page"] { color:var(--red); text-decoration:underline; text-underline-offset:4px; }
+.card, :root[data-theme="dark"] .card { background:var(--paper); border:0; border-radius:0; }
+.card h1 { font-size:1.5rem; }
+.eyebrow { color:var(--red); font-family:system-ui,sans-serif; }
+.dashboard-intro, .history-intro, .settings-intro, .settings-repair-note, :root[data-theme="dark"] .dashboard-intro, :root[data-theme="dark"] .history-intro, :root[data-theme="dark"] .settings-intro, :root[data-theme="dark"] .settings-repair-note { color:var(--muted); }
+button, .button { border:1px solid var(--red); border-radius:0; background:var(--red); color:var(--on-red); font-family:system-ui,sans-serif; font-weight:800; }
+.dashboard-card, :root[data-theme="dark"] .dashboard-card { background:var(--sheet); border:1px solid var(--rule); border-radius:0; box-shadow:3px 4px 0 var(--rule); }
+.dashboard-card time { color:var(--red); font:900 .7rem system-ui,sans-serif; text-transform:uppercase; }
+.dashboard-card ul, .history-subtotals { display:flex; flex-wrap:wrap; gap:.5rem; }
+.dashboard-card li, .history-subtotals li, :root[data-theme="dark"] .dashboard-card li, :root[data-theme="dark"] .history-subtotals li { padding:0; background:transparent; border-radius:0; overflow-wrap:anywhere; }
+.dashboard-card a, .history-record-link { color:var(--red); font-family:system-ui,sans-serif; font-weight:800; }
+.history-list { gap:0; }
+.history-record-card, :root[data-theme="dark"] .history-record-card { gap:8px; padding:13px 0; border:0; border-bottom:1px solid var(--rule); border-radius:0; background:transparent; }
+.history-record-card h3 { margin:0; }
+.history-record-date, :root[data-theme="dark"] .history-record-date { color:var(--muted); font-family:system-ui,sans-serif; }
+.history-record-link, :root[data-theme="dark"] .history-record-link { justify-content:start; padding:0; border:0; color:var(--red); }
+.history-record-link span, :root[data-theme="dark"] .history-record-link span { color:var(--red); }
+.history-empty-state, :root[data-theme="dark"] .history-empty-state { background:var(--sheet); border:1px solid var(--rule); border-radius:0; }
+.history-empty-symbol, :root[data-theme="dark"] .history-empty-symbol { color:var(--red); background:var(--sheet); border-color:var(--rule); }
+.history-empty-state p, :root[data-theme="dark"] .history-empty-state p { color:var(--muted); }
+.status, :root[data-theme="dark"] .status { color:var(--ink); background:var(--sheet); border-color:var(--red); }
+.card > a:not(.button), :root[data-theme="dark"] .card > a:not(.button) { color:var(--red); }
+.settings-page fieldset, :root[data-theme="dark"] .settings-page fieldset { padding:12px; background:var(--sheet); border:1px solid var(--rule); border-radius:0; box-shadow:3px 4px 0 var(--rule); }
+.settings-page label, :root[data-theme="dark"] .settings-page label { color:var(--ink); }
+.settings-page input, :root[data-theme="dark"] .settings-page input { color:var(--ink); background:var(--sheet); border:1px solid var(--rule); border-radius:0; }
+.settings-actions button:first-child:not(:last-child), :root[data-theme="dark"] .settings-actions button:first-child:not(:last-child) { color:var(--red); background:transparent; border-color:var(--red); }
+.settings-actions button:only-child, :root[data-theme="dark"] .settings-actions button:only-child { color:var(--on-red); background:var(--red); border-color:var(--red); }
+.dashboard-reset-button, :root[data-theme="dark"] .dashboard-reset-button { color:var(--red); background:transparent; border-color:var(--red); }
+.confirmation, :root[data-theme="dark"] .confirmation { color:var(--ink); background:var(--paper); border-color:var(--ink); border-radius:0; }
+/* Count ledger follows the same paper and ink as the approved direction. */
+.denomination-value, .denomination-subtotal,
+:root[data-theme="dark"] .denomination-value, :root[data-theme="dark"] .denomination-subtotal,
+.denomination-row input, :root[data-theme="dark"] .denomination-row input,
+.count-title-input, :root[data-theme="dark"] .count-title-input {
+  color:var(--ink); background:var(--sheet); border-color:var(--rule); border-radius:0;
+}
+.denomination-subtotal { overflow-wrap:anywhere; text-align:right; }
+.currency-total, :root[data-theme="dark"] .currency-total { position:sticky; z-index:1; inset-block-start:.5rem; color:var(--ink); background:var(--paper); border-color:var(--ink); }
+.currency-fieldset .denomination-row input:focus-visible { scroll-margin-block-start:7rem; }
+.detail-sheet { margin:1rem 0; padding:12px; border:1px solid var(--rule); background:var(--sheet); box-shadow:3px 4px 0 var(--rule); overflow-wrap:anywhere; }
+.detail-sheet h2 { font-size:1.05rem; }
+.detail-sheet ul { padding-left:1.3rem; }
+.detail-sheet section > p { padding-bottom:.6rem; border-bottom:3px double var(--ink); font-weight:bold; }
+.detail-note { padding:10px; border-left:3px solid #b18a30; background:var(--sheet); overflow-wrap:anywhere; white-space:pre-wrap; }
+.detail-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.detail-actions > button { flex:1 1 12rem; }
+.detail-actions > button:last-child { color:var(--red); background:transparent; }
 @media print {
+  :root, :root[data-theme="dark"], :root[data-theme="dark"] body { --paper:#fff; --sheet:#fff; --ink:#000; --muted:#000; --rule:#777; --red:#000; color:#000; background:#fff; }
+  .detail-sheet { box-shadow:none; }
+  .detail-actions,
+  #offline-ready,
   .skip-link,
   .app-header,
   .bottom-nav,

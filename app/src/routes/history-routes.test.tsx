@@ -54,8 +54,10 @@ describe("stored count routes", () => {
   it("shows the latest saved snapshot and per-currency local statistics", async () => {
     render(<ApplicationRoutes repository={await historyRepository()} />);
 
-    await screen.findByRole("heading", { name: "Latest count" });
+    await screen.findByText("Latest count");
+    expect(screen.getByRole("heading", { name: "Latest count" })).toBeTruthy();
     expect(screen.getByText("$6 USD")).toBeTruthy();
+    expect(screen.getByText("New count", { selector: ".dashboard-card strong" })).toBeTruthy();
     expect(screen.getByText("USD: 2 counts")).toBeTruthy();
     expect(screen.getByText("EUR: 1 count")).toBeTruthy();
     expect(screen.queryByText(/JPY/)).toBeNull();

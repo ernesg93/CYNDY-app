@@ -1,0 +1,27 @@
+{
+  "title": "CYNDY — tres direcciones visuales para conteo local",
+  "brief": "Comparación visual de tres direcciones para las pantallas móviles de conteo, historial guardado y detalle de un conteo. UI en español, contenido sintético CUP/USD, flujos locales y sin conexión preservados. Exploración visual solamente.",
+  "artboards": [
+    {
+      "file": "01-billetera-marino.html",
+      "title": "Billetera marina",
+      "tradeoff": "Recupera la identidad de billetera azul marino con un saldo protagonista y detalle tipo recibo; transmite confianza y claridad, pero su tono financiero puede sentirse más formal.",
+      "width": 1200,
+      "height": 1000
+    },
+    {
+      "file": "02-verde-operativo.html",
+      "title": "Verde operativo",
+      "tradeoff": "Evoluciona el verde oscuro actual hacia una consola compacta de trabajo con estado local y controles por denominación; es eficiente para uso frecuente, pero más densa visualmente.",
+      "width": 1200,
+      "height": 1000
+    },
+    {
+      "file": "03-libro-de-caja.html",
+      "title": "Libro de caja",
+      "tradeoff": "Propone una estructura editorial cálida donde el historial es un diario y el detalle un folio; crea una jerarquía memorable, pero se aleja más del lenguaje de una app utilitaria convencional.",
+      "width": 1200,
+      "height": 1000
+    }
+  ]
+}

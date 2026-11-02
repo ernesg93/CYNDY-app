@@ -126,6 +126,22 @@ describe("count quantity limit", () => {
 });
 
 describe("duplicate count protection", () => {
+  it.each([
+    ["en", "New count", "Save count", "Count saved.", "This count has already been saved. Save it again?", "Saving again creates a separate copy."],
+    ["es", "Nuevo conteo", "Guardar conteo", "Conteo guardado.", "Este conteo ya se guardó. ¿Quieres guardarlo nuevamente?", "Al guardarlo nuevamente se crea una copia independiente."],
+  ])("gives the duplicate dialog a distinct accessible description in %s", async (locale, heading, save, saved, title, description) => {
+    const store = routeRepository([validConfiguration]);
+    window.localStorage.setItem("cyndy.locale", locale);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: heading });
+    fireEvent.click(screen.getByRole("button", { name: save }));
+    await screen.findByText(saved);
+    fireEvent.click(screen.getByRole("button", { name: save }));
+    expect(screen.getByRole("alertdialog", { name: title, description })).toBeTruthy();
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks concurrent saves and allows an intentional identical save only after confirmation", async () => {
     const store = routeRepository([validConfiguration]);
     let finish!: () => void;
@@ -141,8 +157,12 @@ describe("duplicate count protection", () => {
     finish();
     await screen.findByText("Count saved.");
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
-    expect(screen.getByText("This count has already been saved. Save it again?")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    const dialog = screen.getByRole("alertdialog", { name: "This count has already been saved. Save it again?" });
+    expect(dialog.hasAttribute("open")).toBe(true);
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Save count" })));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
     expect(store.saveCount).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
     fireEvent.click(screen.getByRole("button", { name: "Save again" }));

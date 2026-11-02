@@ -377,7 +377,29 @@ button, .button { border:1px solid var(--red); border-radius:0; background:var(-
 .settings-actions button:only-child, :root[data-theme="dark"] .settings-actions button:only-child { color:var(--on-red); background:var(--red); border-color:var(--red); }
 .dashboard-reset-button, :root[data-theme="dark"] .dashboard-reset-button { color:var(--red); background:transparent; border-color:var(--red); }
 .confirmation, :root[data-theme="dark"] .confirmation { color:var(--ink); background:var(--paper); border-color:var(--ink); border-radius:0; }
+/* Count ledger follows the same paper and ink as the approved direction. */
+.denomination-value, .denomination-subtotal,
+:root[data-theme="dark"] .denomination-value, :root[data-theme="dark"] .denomination-subtotal,
+.denomination-row input, :root[data-theme="dark"] .denomination-row input,
+.count-title-input, :root[data-theme="dark"] .count-title-input {
+  color:var(--ink); background:var(--sheet); border-color:var(--rule); border-radius:0;
+}
+.denomination-subtotal { overflow-wrap:anywhere; text-align:right; }
+.currency-total, :root[data-theme="dark"] .currency-total { position:sticky; z-index:1; inset-block-start:.5rem; color:var(--ink); background:var(--paper); border-color:var(--ink); }
+.currency-fieldset .denomination-row input:focus-visible { scroll-margin-block-start:7rem; }
+.detail-sheet { margin:1rem 0; padding:12px; border:1px solid var(--rule); background:var(--sheet); box-shadow:3px 4px 0 var(--rule); overflow-wrap:anywhere; }
+.detail-sheet h2 { font-size:1.05rem; }
+.detail-sheet ul { padding-left:1.3rem; }
+.detail-sheet section > p { padding-bottom:.6rem; border-bottom:3px double var(--ink); font-weight:bold; }
+.detail-note { padding:10px; border-left:3px solid #b18a30; background:var(--sheet); overflow-wrap:anywhere; white-space:pre-wrap; }
+.detail-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.detail-actions > button { flex:1 1 12rem; }
+.detail-actions > button:last-child { color:var(--red); background:transparent; }
 @media print {
+  :root, :root[data-theme="dark"], :root[data-theme="dark"] body { --paper:#fff; --sheet:#fff; --ink:#000; --muted:#000; --rule:#777; --red:#000; color:#000; background:#fff; }
+  .detail-sheet { box-shadow:none; }
+  .detail-actions,
+  #offline-ready,
   .skip-link,
   .app-header,
   .bottom-nav,

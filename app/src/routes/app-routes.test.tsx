@@ -126,6 +126,22 @@ describe("count quantity limit", () => {
 });
 
 describe("duplicate count protection", () => {
+  it.each([
+    ["en", "New count", "Save count", "Count saved.", "This count has already been saved. Save it again?", "Saving again creates a separate copy."],
+    ["es", "Nuevo conteo", "Guardar conteo", "Conteo guardado.", "Este conteo ya se guardó. ¿Quieres guardarlo nuevamente?", "Al guardarlo nuevamente se crea una copia independiente."],
+  ])("gives the duplicate dialog a distinct accessible description in %s", async (locale, heading, save, saved, title, description) => {
+    const store = routeRepository([validConfiguration]);
+    window.localStorage.setItem("cyndy.locale", locale);
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={store} />);
+    await screen.findByRole("heading", { name: heading });
+    fireEvent.click(screen.getByRole("button", { name: save }));
+    await screen.findByText(saved);
+    fireEvent.click(screen.getByRole("button", { name: save }));
+    expect(screen.getByRole("alertdialog", { name: title, description })).toBeTruthy();
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks concurrent saves and allows an intentional identical save only after confirmation", async () => {
     const store = routeRepository([validConfiguration]);
     let finish!: () => void;

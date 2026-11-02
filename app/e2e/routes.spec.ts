@@ -38,6 +38,65 @@ async function configureCountCurrencies(page: Page, firstCurrencyName = "US doll
   await page.goto("/count/new");
 }
 
+for (const [locale, heading, action, navigation, history] of [
+  ["en", "Count details", "Print or save", "CYNDY navigation", "History"],
+  ["es", "Detalles del conteo", "Imprimir o guardar", "Navegación de CYNDY", "Historial"],
+] as const) {
+  test(`legacy detail prints historical data only on request (${locale})`, async ({ page }) => {
+    await configureCountCurrencies(page);
+    await page.getByLabel("$1 quantity").fill("3");
+    await page.getByLabel("€2 quantity").fill("4");
+    await page.getByRole("button", { name: "Save count" }).click();
+    await expect(page.getByText("Count saved.")).toBeVisible();
+    const id = await page.evaluate(async () => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open("cyndy");
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = database.transaction("counts", "readwrite");
+      const store = transaction.objectStore("counts");
+      const count = await new Promise<{ id: string; note?: string }>((resolve, reject) => {
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result[0]);
+        request.onerror = () => reject(request.error);
+      });
+      store.put({ ...count, note: "Historical note\nSecond line" });
+      await new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+      });
+      database.close();
+      return count.id;
+    });
+    const before = await snapshotLocalData(page);
+    await page.addInitScript((language) => {
+      localStorage.setItem("cyndy.locale", language);
+      (window as unknown as { printCalls: number }).printCalls = 0;
+      window.print = () => { (window as unknown as { printCalls: number }).printCalls++; };
+    }, locale);
+    await page.goto(`/history/${id}/receipt`);
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(page.getByText("Historical note Second line")).toBeVisible();
+    await expect(page.getByText("$1 × 3 = $3")).toBeVisible();
+    await expect(page.getByText("€2 × 4 = €8")).toBeVisible();
+    await expect(page.getByRole("link", { name: /Return to history|Volver al historial/ })).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(0);
+    await page.getByRole("button", { name: action }).click();
+    expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(1);
+    await page.emulateMedia({ media: "print" });
+    await expect(page.getByText("Historical note Second line")).toBeVisible();
+    await expect(page.getByText("$1 × 3 = $3")).toBeVisible();
+    await expect(page.getByRole("button", { name: action })).toBeHidden();
+    await expect(page.locator(".bottom-nav")).toBeHidden();
+    expect(await page.locator(".detail-note").evaluate((node) => getComputedStyle(node).color)).toBe("rgb(0, 0, 0)");
+    expect(await snapshotLocalData(page)).toEqual(before);
+    await page.emulateMedia({ media: "screen" });
+    await page.getByRole("navigation", { name: navigation }).getByRole("link", { name: history }).click();
+    await expect(page.getByRole("heading", { name: history, exact: true })).toBeVisible();
+  });
+}
+
 test("a wrapping currency legend does not overlap its total at wide layouts", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 720 });
   await configureCountCurrencies(page, "United States dollar cash drawer primary operating currency");

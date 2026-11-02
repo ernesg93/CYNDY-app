@@ -6,7 +6,6 @@ import {
   BrowserPrintDestination,
   type ReceiptDestination,
 } from "../receipts/receipt-destination";
-import { ReceiptView } from "../receipts/receipt-view";
 import type { CountRecord, IndexedDbRepository } from "../storage/indexed-db-repository";
 
 export interface ConfigurationFormValues {
@@ -77,6 +76,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Counts saved on this device will appear here. Start a count when you are ready.": "Los conteos guardados en este dispositivo aparecerán aquí. Inicia un conteo cuando estés listo.",
   "Loading history…": "Cargando historial…",
   "Count details": "Detalles del conteo",
+  "Saved count": "Folio guardado",
   "Loading count…": "Cargando conteo…",
   "Count deleted": "Conteo eliminado",
   "Count deleted.": "Conteo eliminado.",
@@ -84,7 +84,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Return to history": "Volver al historial",
   "Note": "Nota",
   "No note": "Sin nota",
-  "Open receipt": "Abrir recibo",
+  "Print or save": "Imprimir o guardar",
   "Delete this count": "Eliminar este conteo",
   "Delete this count?": "¿Eliminar este conteo?",
   "Only this saved count will be permanently deleted.": "Solo este conteo guardado se eliminará permanentemente.",
@@ -105,6 +105,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Save count": "Guardar conteo",
   "Saving…": "Guardando…",
   "This count has already been saved. Save it again?": "Este conteo ya se guardó. ¿Quieres guardarlo nuevamente?",
+  "Saving again creates a separate copy.": "Al guardarlo nuevamente se crea una copia independiente.",
   "Save again": "Guardar nuevamente",
   "Cancel": "Cancelar",
   "Clear unsaved count": "Limpiar conteo sin guardar",
@@ -202,7 +203,7 @@ export function resolveRoute(
   const receipt = pathname.match(/^\/history\/([^/]+)\/receipt$/);
   if (receipt) {
     try {
-      return { page: "receipt", countId: decodeURIComponent(receipt[1]) };
+      return { page: "detail", countId: decodeURIComponent(receipt[1]) };
     } catch {
       return { page: "not-found" };
     }
@@ -384,9 +385,7 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
   if (route.page === "settings") return <AppShell><SettingsPage configurations={configurations}
     repository={repository} onSaved={setConfigurations} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
-  if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} /></AppShell>;
-  if (route.page === "receipt") return <AppShell><ReceiptPage countId={route.countId!}
-    repository={repository} destination={receiptDestination} /></AppShell>;
+  if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} destination={receiptDestination} /></AppShell>;
   return <AppShell><Page title="Page not found"><ReturnHomeLink /></Page></AppShell>;
 }
 
@@ -488,8 +487,8 @@ function HistoryPage({ repository }: { repository: IndexedDbRepository }) {
   </Page>;
 }
 
-function CountDetailPage({ countId, repository }: {
-  countId: string; repository: IndexedDbRepository;
+function CountDetailPage({ countId, repository, destination }: {
+  countId: string; repository: IndexedDbRepository; destination: ReceiptDestination;
 }) {
   const t = useText();
   const [record, setRecord] = useState<CountRecord | null>();
@@ -509,18 +508,19 @@ function CountDetailPage({ countId, repository }: {
     role="status" tabIndex={-1}>{t("Count deleted.")}</p>
     <a href="/history">{t("Return to history")}</a></Page>;
   if (record === null) return <Page title="Count not found"><a href="/history">{t("Return to history")}</a></Page>;
-  return <Page title="Count details">
+  return <Page title="Count details" className="detail-page">
+    <p className="eyebrow">{t("Saved count")}</p>
     <h2>{record.title || t("New count")}</h2>
     <CountTime record={record} />
-    {record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
+    <div className="detail-sheet">{record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
       <h2>{snapshot.name} ({snapshot.code})</h2>
       <ul>{snapshot.entries.map((entry) => <li key={entry.denomination}>
         {snapshot.symbol}{entry.denomination} × {entry.quantity} = {snapshot.symbol}{entry.total}
       </li>)}</ul>
       <p>{t("Subtotal")}: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
-    </section>)}
-    <h2>{t("Note")}</h2><p>{record.note ?? t("No note")}</p>
-    <a href={`/history/${encodeURIComponent(record.id)}/receipt`}>{t("Open receipt")}</a>{" "}
+    </section>)}</div>
+    <h2>{t("Note")}</h2><p className="detail-note">{record.note ?? t("No note")}</p>
+    <div className="detail-actions"><button type="button" onClick={() => destination.deliver(record)}>{t("Print or save")}</button>
     {deleteError && <p ref={feedbackRef} className="error" role="alert" tabIndex={-1}>
       {t(deleteError)}
     </p>}
@@ -539,26 +539,8 @@ function CountDetailPage({ countId, repository }: {
       : <button ref={deleteButtonRef} type="button" onClick={() => {
         setDeleteError(undefined); setConfirmingDelete(true);
       }}>{t("Delete this count")}</button>}
-    {" "}
-    <a href="/history">{t("Return to history")}</a>
+    </div>
   </Page>;
-}
-
-function ReceiptPage({ countId, repository, destination }: {
-  countId: string;
-  repository: IndexedDbRepository;
-  destination: ReceiptDestination;
-}) {
-  const t = useText();
-  const [record, setRecord] = useState<CountRecord | null>();
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    void repository.getCount(countId).then((count) => setRecord(count ?? null)).catch(() => setError(true));
-  }, [countId, repository]);
-  if (error) return <RecordsError />;
-  if (record === undefined) return <Page title="Count receipt"><p role="status">{t("Loading receipt…")}</p></Page>;
-  if (record === null) return <Page title="Count not found"><a href="/history">{t("Return to history")}</a></Page>;
-  return <Page title="Count receipt"><ReceiptView record={record} destination={destination} /></Page>;
 }
 
 function ConfirmationPanel({ title, description, cancelLabel, confirmLabel, onCancel, onConfirm, variant }: {
@@ -841,7 +823,7 @@ function CountPage({ configurations, repository, state, onChange }: {
     </div>
     {confirmation && <ConfirmationPanel
       title="This count has already been saved. Save it again?"
-      description="This count has already been saved. Save it again?"
+      description="Saving again creates a separate copy."
       cancelLabel="Cancel" confirmLabel="Save again"
       onCancel={() => { setConfirmation(undefined); setTimeout(() => saveButtonRef.current?.focus()); }}
       onConfirm={() => void save(true)} />}

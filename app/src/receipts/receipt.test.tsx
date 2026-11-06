@@ -21,7 +21,7 @@ async function repositoryWithCount() {
 }
 
 describe("unified saved count", () => {
-  for (const [locale, title, action, nav] of [["en", "Count details", "Print or save", "CYNDY navigation"], ["es", "Detalles del conteo", "Imprimir o guardar", "Navegación de CYNDY"]]) {
+  for (const [locale, title, action, nav] of [["en", "Count details", "Print or save", "CYNDY navigation"], ["es", "Detalles del conteo", "Imprimir o Guardar", "Navegación de CYNDY"]]) {
     for (const suffix of ["", "/receipt"]) {
       it(`${locale}: opens direct ${suffix || "detail"} without printing and prints only on request`, async () => {
         localStorage.setItem("cyndy.locale", locale);
@@ -31,10 +31,11 @@ describe("unified saved count", () => {
         window.history.replaceState({}, "", `/history/saved-count${suffix}`);
         render(<ApplicationRoutes repository={repository} receiptDestination={new BrowserPrintDestination(print)} />);
         expect(await screen.findByRole("heading", { name: title })).toBeTruthy();
-        expect(await screen.findByText("$1 × 3 = $3")).toBeTruthy();
-        expect(screen.getByText("$5 × 2 = $10")).toBeTruthy();
-        expect(screen.getByText("€2 × 4 = €8")).toBeTruthy();
-        expect(screen.getByText("Safe note")).toBeTruthy();
+        const dollar = await screen.findByRole("table", { name: "US dollar (USD)" });
+        expect(within(dollar).getByText("$1")).toBeTruthy();
+        expect(within(dollar).getByText("$10")).toBeTruthy();
+        expect(screen.getByRole("table", { name: "Euro (EUR)" })).toBeTruthy();
+        expect(screen.queryByText("Safe note")).toBeNull();
         expect(document.body.textContent).not.toMatch(/JPY|1000/);
         expect(screen.queryByRole("link", { name: /Return to history|Volver al historial/ })).toBeNull();
         expect(within(screen.getByRole("navigation", { name: nav })).getAllByRole("link")).toHaveLength(3);

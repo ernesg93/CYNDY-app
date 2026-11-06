@@ -19,6 +19,11 @@ const emptyConfiguration: ConfigurationFormValues = {
   name: "", symbol: "", code: "", denominations: "",
 };
 
+const defaultCurrencies: readonly CurrencyConfiguration[] = [
+  { id: "usd", name: "Dolar US", symbol: "$", code: "USD", denominations: [1, 2, 5, 10, 20, 50, 100] },
+  { id: "cup", name: "Pesos cubano", symbol: "$", code: "CUP", denominations: [1, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000] },
+];
+
 type Locale = "en" | "es";
 const LocaleContext = createContext<Locale>("en");
 
@@ -56,6 +61,8 @@ const spanish: Readonly<Record<string, string>> = {
   "Local dashboard": "Panel local",
   "Review saved counts on this device.": "Revisa los conteos guardados en este dispositivo.",
   "Start a count": "Iniciar un conteo",
+  "Choose currencies": "Elige las monedas",
+  "Configure another currency": "Configurar otra moneda",
   "Latest count": "Último conteo",
   "View latest count": "Ver último conteo",
   "No saved counts yet.": "Aún no hay conteos guardados.",
@@ -84,7 +91,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Return to history": "Volver al historial",
   "Note": "Nota",
   "No note": "Sin nota",
-  "Print or save": "Imprimir o guardar",
+  "Print or save": "Imprimir o Guardar",
   "Delete this count": "Eliminar este conteo",
   "Delete this count?": "¿Eliminar este conteo?",
   "Only this saved count will be permanently deleted.": "Solo este conteo guardado se eliminará permanentemente.",
@@ -98,6 +105,11 @@ const spanish: Readonly<Record<string, string>> = {
   "Currency code": "Código de moneda",
   "Denominations (comma separated)": "Denominaciones (separadas por comas)",
   "Add another currency": "Agregar otra moneda",
+  "Move up": "Subir",
+  "Move down": "Bajar",
+  "Move": "Mover",
+  "up": "arriba",
+  "down": "abajo",
   "Save configuration": "Guardar configuración",
   "Save settings": "Guardar ajustes",
   "Local settings": "Ajustes locales",
@@ -108,10 +120,10 @@ const spanish: Readonly<Record<string, string>> = {
   "Saving again creates a separate copy.": "Al guardarlo nuevamente se crea una copia independiente.",
   "Save again": "Guardar nuevamente",
   "Cancel": "Cancelar",
-  "Clear unsaved count": "Limpiar conteo sin guardar",
+  "Clear unsaved count": "Limpiar conteo",
   "Loading saved counts…": "Cargando conteos guardados…",
   "View count": "Ver conteo",
-  "Add up to two currencies and their positive whole-number denominations.": "Agrega hasta dos monedas y sus denominaciones enteras positivas.",
+  "Add currencies and their positive whole-number denominations.": "Agrega monedas y sus denominaciones enteras positivas.",
   "Edit the currencies and positive whole-number denominations used by future counts.": "Edita las monedas y denominaciones enteras positivas usadas en conteos futuros.",
   "Changes apply to future counts. Saved counts keep their original values.": "Los cambios se aplican a conteos futuros. Los conteos guardados conservan sus valores originales.",
   "Could not load local settings. Refresh and try again.": "No se pudieron cargar los ajustes locales. Actualiza e inténtalo de nuevo.",
@@ -136,6 +148,8 @@ const spanish: Readonly<Record<string, string>> = {
   "currency codes must be unique": "los códigos de moneda deben ser únicos",
   "quantity": "cantidad",
   "Subtotal": "Subtotal",
+  "Denomination": "Denominación",
+  "Quantity": "Cantidad",
   "Enter a non-negative whole number within the safe integer range.": "Ingresa un número entero no negativo dentro del rango seguro.",
   "saved": "guardado",
   "count": "conteo",
@@ -326,12 +340,18 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
   const [saveError, setSaveError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [path, setPath] = useState(() => `${window.location.pathname}${window.location.search}`);
+  const [selectedCurrencies, setSelectedCurrencies] = useState<readonly string[]>([]);
   const [countDraft, setCountDraft] = useState<CountDraftState>({
     quantities: {}, note: "", invalidQuantityKeys: new Set(),
   });
   useEffect(() => {
     void repository.getCurrencyConfigurations()
-      .then(setConfigurations)
+      .then(async (saved) => {
+        const initial = saved.length || window.location.pathname === "/onboarding" ? saved : defaultCurrencies;
+        if (!saved.length && initial.length) await repository.saveCurrencyConfigurations(initial);
+        setConfigurations(initial);
+        setSelectedCurrencies(initial.map((currency) => currency.id));
+      })
       .catch(() => setLoadError("Could not load local settings. Refresh and try again."));
   }, [repository]);
   useEffect(() => {
@@ -358,6 +378,7 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
       if (result.saved && result.configurations) {
         replaceLocation("/");
         setConfigurations(result.configurations);
+        setSelectedCurrencies(result.configurations.map((currency) => currency.id));
       }
     } catch {
       setIssues([]);
@@ -372,25 +393,27 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
       onAdd={() => setValues([...values, emptyConfiguration])}
       onSubmit={() => void save()} /></AppShell>;
   }
-  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} onReset={() => {
-    replaceLocation("/onboarding");
+  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} configurations={configurations} selected={selectedCurrencies} onSelectionChange={setSelectedCurrencies} onReset={() => {
+    replaceLocation("/");
+    setSelectedCurrencies(defaultCurrencies.map((currency) => currency.id));
     setNotice("All local data was reset.");
     setValues([emptyConfiguration]);
     setIssues([[]]);
     setSaveError(undefined);
-    setConfigurations([]);
+    setConfigurations(defaultCurrencies);
   }} /></AppShell>;
   if (route.page === "count") return <AppShell><CountPage configurations={configurations}
-    repository={repository} state={countDraft} onChange={setCountDraft} /></AppShell>;
+    repository={repository} state={countDraft} onChange={setCountDraft} selected={selectedCurrencies} onSelectionChange={setSelectedCurrencies} /></AppShell>;
   if (route.page === "settings") return <AppShell><SettingsPage configurations={configurations}
-    repository={repository} onSaved={setConfigurations} /></AppShell>;
+    repository={repository} onSaved={(updated) => { setConfigurations(updated); setSelectedCurrencies((current) => [...current.filter((id) => updated.some((currency) => currency.id === id)), ...updated.filter((currency) => !configurations.some((previous) => previous.id === currency.id)).map((currency) => currency.id)]); }} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
   if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} destination={receiptDestination} /></AppShell>;
   return <AppShell><Page title="Page not found"><ReturnHomeLink /></Page></AppShell>;
 }
 
-function Dashboard({ repository, onReset }: {
+function Dashboard({ repository, onReset, configurations, selected, onSelectionChange }: {
   repository: IndexedDbRepository; onReset: () => void;
+  configurations: readonly CurrencyConfiguration[]; selected: readonly string[]; onSelectionChange: (ids: readonly string[]) => void;
 }) {
   const t = useText();
   const [data, setData] = useState<{
@@ -399,6 +422,7 @@ function Dashboard({ repository, onReset }: {
   const [error, setError] = useState(false);
   const [resetStage, setResetStage] = useState<0 | 1 | 2>(0);
   const [resetError, setResetError] = useState<string>();
+  const [resetNotice, setResetNotice] = useState(false);
   const resetButtonRef = useRef<HTMLButtonElement>(null);
   const resetErrorRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
@@ -417,7 +441,9 @@ function Dashboard({ repository, onReset }: {
   return <Page title="Dashboard">
     <p className="eyebrow">{t("Local dashboard")}</p>
     <p className="dashboard-intro">{t("Review saved counts on this device.")}</p>
-    <a className="button dashboard-start" href="/count/new">{t("Start a count")}</a>
+    <CurrencySelector configurations={configurations} selected={selected} onChange={onSelectionChange} />
+    <a className="button dashboard-start" href="/count/new" onClick={(event) => { if (selected.length === 0) event.preventDefault(); else navigateLocally("/count/new")(event); }} aria-disabled={selected.length === 0} >{t("Start a count")}</a>
+    <a href="/settings" onClick={navigateLocally("/settings")}>{t("Configure another currency")}</a>
     <section className="dashboard-section" aria-labelledby="latest-count-title"><h2 id="latest-count-title">{t("Latest count")}</h2>
     {data.latest ? <article className="dashboard-card">
       <CountTime record={data.latest} />
@@ -430,11 +456,12 @@ function Dashboard({ repository, onReset }: {
     <ul>{[...statistics].map(([code, count]) =>
       <li key={code}>{code}: {count} {t(count === 1 ? "count" : "counts")}</li>)}</ul></article></section>
     <section className="dashboard-section dashboard-data" aria-labelledby="local-data-title"><h2 id="local-data-title">{t("Local data")}</h2>
+    {resetNotice && <p className="status" role="status">{t("All local data was reset.")}</p>}
     {resetError && <p ref={resetErrorRef} className="error" role="alert" tabIndex={-1}>
       {t(resetError)}
     </p>}
     {resetStage === 0 ? <button ref={resetButtonRef} className="dashboard-reset-button" type="button" onClick={() => {
-      setResetError(undefined); setResetStage(1);
+      setResetNotice(false); setResetError(undefined); setResetStage(1);
     }}>{t("Reset all local data")}</button> : <ConfirmationPanel
       variant="reset"
       title={resetStage === 1 ? "Reset all local data?" : "Final reset confirmation"}
@@ -446,8 +473,8 @@ function Dashboard({ repository, onReset }: {
       onCancel={() => {
         setResetStage(0); setTimeout(() => resetButtonRef.current?.focus());
       }}
-      onConfirm={() => resetStage === 1 ? setResetStage(2) : void repository.resetAll()
-        .then(onReset)
+      onConfirm={() => resetStage === 1 ? setResetStage(2) : void repository.resetAll(defaultCurrencies)
+        .then(() => { setData({ counts: [] }); setResetStage(0); setResetNotice(true); onReset(); })
         .catch(() => {
           setResetStage(0);
           setResetError("Could not reset local data. Try again.");
@@ -509,17 +536,16 @@ function CountDetailPage({ countId, repository, destination }: {
     <a href="/history">{t("Return to history")}</a></Page>;
   if (record === null) return <Page title="Count not found"><a href="/history">{t("Return to history")}</a></Page>;
   return <Page title="Count details" className="detail-page">
-    <p className="eyebrow">{t("Saved count")}</p>
     <h2>{record.title || t("New count")}</h2>
     <CountTime record={record} />
     <div className="detail-sheet">{record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
       <h2>{snapshot.name} ({snapshot.code})</h2>
-      <ul>{snapshot.entries.map((entry) => <li key={entry.denomination}>
-        {snapshot.symbol}{entry.denomination} × {entry.quantity} = {snapshot.symbol}{entry.total}
-      </li>)}</ul>
-      <p>{t("Subtotal")}: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
+      <table className="detail-table" aria-label={`${snapshot.name} (${snapshot.code})`}>
+        <thead><tr><th scope="col">{t("Denomination")}</th><th scope="col">{t("Quantity")}</th><th scope="col">{t("Subtotal")}</th></tr></thead>
+        <tbody>{snapshot.entries.map((entry) => <tr key={entry.denomination}><td>{snapshot.symbol}{entry.denomination}</td><td>{entry.quantity}</td><td>{snapshot.symbol}{entry.total}</td></tr>)}</tbody>
+      </table>
+      <p>{t("Total")}: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
     </section>)}</div>
-    <h2>{t("Note")}</h2><p className="detail-note">{record.note ?? t("No note")}</p>
     <div className="detail-actions"><button type="button" onClick={() => destination.deliver(record)}>{t("Print or save")}</button>
     {deleteError && <p ref={feedbackRef} className="error" role="alert" tabIndex={-1}>
       {t(deleteError)}
@@ -613,12 +639,12 @@ function ConfigurationPage(props: ConfigurationPageProps) {
   return <Page title="Set up CYNDY">
     {props.error && <p ref={messageRef} className="error" role="alert" tabIndex={-1}>{t(props.error)}</p>}
     {props.status && !props.error && <p ref={messageRef} className="status" role="status" tabIndex={-1}>{t(props.status)}</p>}
-    <p>{t("Add up to two currencies and their positive whole-number denominations.")}</p>
+    <p>{t("Add currencies and their positive whole-number denominations.")}</p>
     <form onSubmit={(event: FormEvent) => { event.preventDefault(); props.onSubmit(); }} noValidate>
       {props.values.map((values, index) => <ConfigurationForm key={index}
         values={values} issues={props.issues[index] ?? []} index={index}
         onChange={(draft) => props.onChange(index, draft)} />)}
-      {props.values.length < 2 && <button type="button" onClick={props.onAdd}>{t("Add another currency")}</button>}
+      {<button type="button" onClick={props.onAdd}>{t("Add another currency")}</button>}
       <button type="submit">{t("Save configuration")}</button>
     </form>
   </Page>;
@@ -638,6 +664,8 @@ function SettingsPage({ configurations, repository, onSaved }: {
       denominations: configuration.denominations.join(", "),
     })) : [emptyConfiguration]);
   const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
+  const [keys, setKeys] = useState(() => configurations.length ? configurations.map((_, index) => index) : [0]);
+  const nextKey = useRef(keys.length);
   const [message, setMessage] = useState<string>();
   const [error, setError] = useState<string>();
   const formRef = useRef<HTMLFormElement>(null);
@@ -664,22 +692,43 @@ function SettingsPage({ configurations, repository, onSaved }: {
     }
   };
 
+  const move = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= values.length) return;
+    const swap = <T,>(items: readonly T[]): T[] => {
+      const copy = [...items];
+      [copy[index], copy[target]] = [copy[target], copy[index]];
+      return copy;
+    };
+    setValues(swap(values));
+    setKeys(swap(keys));
+    setIssues(swap(values.map((_, itemIndex) => issues[itemIndex] ?? [])));
+    setMessage(undefined);
+  };
+
   return <Page title="Settings" className="settings-page">
     <p className="eyebrow">{t("Local settings")}</p>
     <p className="settings-intro">{t("Edit the currencies and positive whole-number denominations used by future counts.")}</p>
     {error && <p ref={messageRef} className="error" role="alert" tabIndex={-1}>{t(error)}</p>}
     {message && !error && <p ref={messageRef} className="status" role="status" tabIndex={-1}>{t(message)}</p>}
     <form ref={formRef} onSubmit={(event: FormEvent) => { event.preventDefault(); void save(); }} noValidate>
-      {values.map((item, index) => <ConfigurationForm key={index} values={item}
-        issues={issues[index] ?? []} index={index}
-        onChange={(draft) => {
-          setValues(values.map((value, itemIndex) => itemIndex === index ? draft : value));
-          setMessage(undefined);
-        }} />)}
+      {values.map((item, index) => <div key={keys[index]} className="settings-currency">
+        <ConfigurationForm values={item} issues={issues[index] ?? []} index={index}
+          onChange={(draft) => {
+            setValues(values.map((value, itemIndex) => itemIndex === index ? draft : value));
+            setMessage(undefined);
+          }} />
+        <div className="currency-order-actions">
+          <button type="button" disabled={index === 0} aria-label={`${t("Move")} ${item.code || `${t("Currency")} ${index + 1}`} ${t("up")}`} onClick={() => move(index, -1)}>{t("Move up")}</button>
+          <button type="button" disabled={index === values.length - 1} aria-label={`${t("Move")} ${item.code || `${t("Currency")} ${index + 1}`} ${t("down")}`} onClick={() => move(index, 1)}>{t("Move down")}</button>
+        </div>
+      </div>)}
       <div className="settings-actions">
-        {values.length < 2 && <button type="button"
+        {<button type="button"
           onClick={() => {
-            setValues([...values, emptyConfiguration]);
+            setValues([{ ...emptyConfiguration }, ...values]);
+            setKeys([nextKey.current++, ...keys]);
+            setIssues([[], ...values.map((_, index) => issues[index] ?? [])]);
             setMessage(undefined);
           }}>{t("Add another currency")}</button>}
         <button type="submit">{t("Save settings")}</button>
@@ -689,13 +738,28 @@ function SettingsPage({ configurations, repository, onSaved }: {
   </Page>;
 }
 
-function CountPage({ configurations, repository, state, onChange }: {
-  configurations: readonly CurrencyConfiguration[];
+function CurrencySelector({ configurations, selected, onChange }: {
+  configurations: readonly CurrencyConfiguration[]; selected: readonly string[];
+  onChange: (ids: readonly string[]) => void;
+}) {
+  const t = useText();
+  return <fieldset className="currency-selector"><legend>{t("Choose currencies")}</legend>
+    {configurations.map((currency) => <label key={currency.id}>
+      <input type="checkbox" checked={selected.includes(currency.id)} onChange={(event) => onChange(
+        event.target.checked ? [...selected, currency.id] : selected.filter((id) => id !== currency.id)
+      )} /> {currency.code}
+    </label>)}
+  </fieldset>;
+}
+
+function CountPage({ configurations: allConfigurations, repository, state, onChange, selected, onSelectionChange }: {
+  configurations: readonly CurrencyConfiguration[]; selected: readonly string[]; onSelectionChange: (ids: readonly string[]) => void;
   repository: Pick<IndexedDbRepository, "saveCount">;
   state: CountDraftState;
   onChange: (update: CountDraftState | ((state: CountDraftState) => CountDraftState)) => void;
 }) {
   const t = useText();
+  const configurations = allConfigurations.filter((currency) => selected.includes(currency.id));
   const { quantities: draft, note, message, invalidQuantityKeys } = state;
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -706,7 +770,7 @@ function CountPage({ configurations, repository, state, onChange }: {
   let rangeExceeded = false;
   let snapshots;
   try {
-    snapshots = calculateCountSnapshots(configurations, quantities);
+    snapshots = configurations.length ? calculateCountSnapshots(configurations, quantities) : [];
   } catch (error) {
     if (!(error instanceof RangeError)) throw error;
     rangeExceeded = true;
@@ -720,7 +784,7 @@ function CountPage({ configurations, repository, state, onChange }: {
   };
 
   const save = async (confirmDuplicate = false) => {
-    if (savingRef.current) return;
+    if (savingRef.current || configurations.length === 0) return;
     const invalidKeys = new Set(configurations.flatMap((configuration) =>
       configuration.denominations.map((denomination) => `${configuration.id}:${denomination}`)
         .filter((key) => isInvalidQuantity(draft[key] ?? ""))));
@@ -752,11 +816,9 @@ function CountPage({ configurations, repository, state, onChange }: {
       await repository.saveCount(payload);
       onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
         lastSavedCount: fingerprint, message: "Count saved." }));
-    } catch (error) {
+    } catch {
       onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
-        message: error instanceof TypeError
-        ? "Quantities must be non-negative integers."
-        : "Could not save the count. Try again." }));
+        message: "Could not save the count. Try again." }));
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -766,6 +828,7 @@ function CountPage({ configurations, repository, state, onChange }: {
   return <Page title="New count" className="count-page" heading={<input className="count-title-input"
     aria-label={t("Count title")} placeholder={t("New count")} value={note}
     onChange={(event) => { setConfirmation(undefined); onChange({ ...state, note: event.target.value }); }} />}><form onSubmit={(event) => { event.preventDefault(); void save(); }} noValidate>
+    <CurrencySelector configurations={allConfigurations} selected={selected} onChange={onSelectionChange} />
     {configurations.map((configuration, currencyIndex) =>
       <fieldset className="currency-fieldset" key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
@@ -785,7 +848,9 @@ function CountPage({ configurations, repository, state, onChange }: {
             aria-label={`${configuration.symbol}${entry.denomination} ${t("quantity")}`}
             aria-invalid={invalid ? true : undefined}
             aria-describedby={`${subtotalDescriptionId}${invalid ? ` ${errorId}` : ""}`}
-            value={draft[key] ?? ""}
+            value={draft[key] ?? "0"}
+            onFocus={(event) => event.currentTarget.select()}
+            onBlur={(event) => { if (event.currentTarget.value === "") onChange((current) => ({ ...current, quantities: { ...current.quantities, [key]: "0" } })); }}
             onChange={(event) => {
               const value = event.target.value;
               if (/^\d{9,}$/.test(value)) {
@@ -818,7 +883,7 @@ function CountPage({ configurations, repository, state, onChange }: {
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{t(message)}</p>}
     <div className="actions">
-      <button ref={saveButtonRef} type="submit" disabled={saving}>{t(saving ? "Saving…" : "Save count")}</button>
+      <button ref={saveButtonRef} type="submit" disabled={saving || configurations.length === 0}>{t(saving ? "Saving…" : "Save count")}</button>
       <button type="button" className="secondary" onClick={clear}>{t("Clear unsaved count")}</button>
     </div>
     {confirmation && <ConfirmationPanel
@@ -890,6 +955,23 @@ function AppShell({ children }: { children: React.ReactNode }) {
     return navigator.language.toLowerCase().startsWith("en") ? "en" : "es";
   });
   const [dark, setDark] = useState(() => readOptionalPreference("cyndy.theme") !== "light");
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const notice = document.querySelector<HTMLElement>("#offline-ready");
+    if (!notice || !headerRef.current) return;
+    headerRef.current.insertAdjacentElement("afterend", notice);
+    const update = () => { notice.dataset.home = String(window.location.pathname === "/"); };
+    update();
+    window.addEventListener("popstate", update);
+    return () => { window.removeEventListener("popstate", update); document.body.prepend(notice); };
+  }, []);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => document.documentElement.style.setProperty("--visual-offset", `${viewport.offsetTop}px`);
+    update(); viewport.addEventListener("scroll", update); viewport.addEventListener("resize", update);
+    return () => { viewport.removeEventListener("scroll", update); viewport.removeEventListener("resize", update); document.documentElement.style.removeProperty("--visual-offset"); };
+  }, []);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     writeOptionalPreference("cyndy.theme", dark ? "dark" : "light");
@@ -908,8 +990,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const activePath = window.location.pathname;
   return <LocaleContext.Provider value={locale}>
     <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>{es ? "Saltar al contenido principal" : "Skip to main content"}</a>
-    <header className="app-header">
-      <a className="header-control home-control" href="/" aria-label={words.home}>⌂</a>
+    <header className="app-header" ref={headerRef}>
+      <a className="header-control home-control" href="/" aria-label={words.home}><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11 12 3l9 8M5 10v10h14V10M9 20v-6h6v6" /></svg></a>
       <a className="brand" href="/" aria-label={es ? "Inicio de CYNDY" : "CYNDY home"}><span aria-hidden="true">C</span> CYNDY</a>
       <div className="header-actions"><button type="button" className="header-control" aria-label={words.theme} onClick={() => setDark((value) => !value)}>{dark ? "☾" : "☀"}</button><button type="button" className="header-control" aria-label={words.language} onClick={() => { const next = es ? "en" : "es"; writeOptionalPreference("cyndy.locale", next); setLocale(next); }}>{es ? "ES" : "EN"}</button></div>
     </header>
@@ -923,8 +1005,9 @@ function navigateLocally(path: string) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     window.history.pushState({}, "", path);
+    window.scrollTo(0, 0);
     window.dispatchEvent(new PopStateEvent("popstate"));
-    window.setTimeout(() => document.getElementById("main-content")?.focus(), 0);
+    window.setTimeout(() => document.getElementById("main-content")?.focus({ preventScroll: true }), 0);
   };
 }
 

@@ -297,6 +297,10 @@ button.secondary {
 .settings-intro { margin:8px 0 16px; }
 .settings-repair-note { margin:0; font-size:.75rem; }
 .settings-page form { display:grid; gap:12px; }
+.settings-currency { min-width:0; }
+.currency-order-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:8px; }
+.currency-order-actions button { min-width:0; padding-inline:.5rem; }
+.currency-order-actions button:disabled { opacity:.45; }
 .settings-page fieldset { min-inline-size:0; margin:0; padding:12px; border:1px solid #c7d2c8; border-radius:18px; }
 .settings-page legend { padding-inline:4px; font-size:.875rem; font-weight:800; }
 .settings-page .field { gap:4px; margin-block:8px; }
@@ -417,3 +421,25 @@ button, .button { border:1px solid var(--red); border-radius:0; background:var(-
     padding: 0;
   }
 }
+
+/* Currency choices and centred ledger entries. */
+.currency-selector { display:flex; flex-wrap:wrap; gap:.5rem; border:0; padding:0; margin:1rem 0; }
+.currency-selector legend { font-weight:700; margin-bottom:.5rem; }
+.currency-selector label { display:flex; align-items:center; gap:.4rem; min-height:44px; padding:.3rem .7rem; border:1px solid var(--rule); }
+.currency-selector input { min-height:0; width:1.15rem; height:1.15rem; }
+.denomination-value, .denomination-subtotal { justify-content:center; text-align:center; }
+.denomination-row input { text-align:center; }
+
+.app-header { position:sticky; top:var(--visual-offset, 0px); z-index:4; }
+.header-control, :root[data-theme="light"] .header-control, :root[data-theme="dark"] .app-header .home-control { border:0; background:transparent; }
+#offline-ready[data-home="false"] { display:none; }
+.currency-total, :root[data-theme="dark"] .currency-total { inset-block-start:calc(68px + var(--visual-offset, 0px)); }
+.detail-page > h1 { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.detail-table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+.detail-table th, .detail-table td { text-align:center; padding:.5rem .15rem; border-bottom:1px solid var(--rule); }
+.detail-table th { font:700 .7rem system-ui,sans-serif; }
+.count-page .actions, .detail-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.count-page .actions > button, .detail-actions > button { min-width:0; padding-inline:.5rem; overflow-wrap:anywhere; }
+.detail-actions > :not(button) { grid-column:1 / -1; }
+@media print { .detail-actions { display:none; } }
+@media (max-width:24rem) { .currency-total, :root[data-theme="dark"] .currency-total { inset-block-start:calc(60px + var(--visual-offset, 0px)); } }

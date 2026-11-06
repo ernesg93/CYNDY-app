@@ -6,6 +6,12 @@ CYNDY is a clean-room, Android-first money counter designed to work offline afte
 
 CYNDY is an Android-first, offline-capable MVP with device-local currency settings, counting, history, receipts, and progressive web app support. The first successful load requires an internet connection.
 
+## Start a count
+
+On a fresh installation, USD and CUP are ready to use. Select one or more currencies on the dashboard, then start a count; you can also change the selection while counting. A temporarily deselected currency keeps its draft quantities but is not included when the count is saved. Use Settings to add other currencies and denominations.
+
+Resetting local data removes saved counts and restores the default currencies.
+
 ## Product boundaries
 
 - Counts are independent records, not register closures or shift handoffs.

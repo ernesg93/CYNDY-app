@@ -60,7 +60,7 @@ describe("stored count routes", () => {
     expect(screen.getByText("New count", { selector: ".dashboard-card strong" })).toBeTruthy();
     expect(screen.getByText("USD: 2 counts")).toBeTruthy();
     expect(screen.getByText("EUR: 1 count")).toBeTruthy();
-    expect(screen.queryByText(/JPY/)).toBeNull();
+    expect(within(screen.getByRole("region", { name: "Local statistics" })).queryByText(/JPY/)).toBeNull();
     expect(screen.getByRole("link", { name: "View latest count" }).getAttribute("href"))
       .toBe("/history/count-2");
     expectNeutralLanguage();
@@ -119,11 +119,12 @@ describe("stored count routes", () => {
     window.history.replaceState({}, "", "/history/count-1");
     render(<ApplicationRoutes repository={repository} />);
 
-    expect(await screen.findByText("$1 × 3 = $3")).toBeTruthy();
-    expect(screen.getByText("$5 × 2 = $10")).toBeTruthy();
-    expect(screen.getByText("Subtotal: $13 USD")).toBeTruthy();
-    expect(screen.getByText("Subtotal: €8 EUR")).toBeTruthy();
-    expect(screen.getByText("Updated current note")).toBeTruthy();
+    expect(await screen.findByRole("table", { name: "US dollar (USD)" })).toBeTruthy();
+    expect(screen.getAllByRole("columnheader", { name: "Denomination" })[0]).toBeTruthy();
+    expect(screen.getByText("Total: $13 USD")).toBeTruthy();
+    expect(screen.getByText("Total: €8 EUR")).toBeTruthy();
+    expect(screen.getAllByRole("columnheader", { name: "Subtotal" })).toHaveLength(2);
+    expect(screen.queryByText("Updated current note")).toBeNull();
     expect(screen.getByRole("heading", { name: "New count" })).toBeTruthy();
     expect(screen.getByText(new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "short" }).format(new Date("2026-10-12T10:00:00.000Z"))).tagName).toBe("TIME");
     expect(screen.queryByText(/JPY|1000/)).toBeNull();
@@ -266,10 +267,11 @@ describe("stored count routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
 
-    expect((await screen.findByRole("status")).textContent).toBe("All local data was reset.");
-    expect(screen.getByRole("heading", { name: "Set up CYNDY" })).toBeTruthy();
-    expect(await repository.getCurrencyConfigurations()).toEqual([]);
+    await waitFor(async () => expect((await repository.getCurrencyConfigurations()).map((currency) => currency.code)).toEqual(["USD", "CUP"]));
     expect(await repository.listCounts()).toEqual([]);
+    expect(screen.getByRole("status").textContent).toBe("All local data was reset.");
+    expect(screen.queryByRole("link", { name: "View latest count" })).toBeNull();
+    expect(screen.getByText("0 saved counts")).toBeTruthy();
   });
 
   it("clears retained configuration drafts after a confirmed reset", async () => {
@@ -294,12 +296,8 @@ describe("stored count routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue reset" }));
     fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
 
-    await screen.findByRole("heading", { name: "Set up CYNDY" });
-    expect(screen.getByLabelText<HTMLInputElement>("Currency name").value).toBe("");
-    expect(screen.getByLabelText<HTMLInputElement>("Symbol").value).toBe("");
-    expect(screen.getByLabelText<HTMLInputElement>("Currency code").value).toBe("");
-    expect(screen.getByLabelText<HTMLInputElement>("Denominations (comma separated)").value)
-      .toBe("");
+    await waitFor(async () => expect((await repository.getCurrencyConfigurations()).map((currency) => currency.code)).toEqual(["USD", "CUP"]));
+    expect(await repository.listCounts()).toEqual([]);
   });
 
   it("announces a reset error without leaving the configured dashboard", async () => {

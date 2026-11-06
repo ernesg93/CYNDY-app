@@ -40,7 +40,7 @@ async function configureCountCurrencies(page: Page, firstCurrencyName = "US doll
 
 for (const [locale, heading, action, navigation, history] of [
   ["en", "Count details", "Print or save", "CYNDY navigation", "History"],
-  ["es", "Detalles del conteo", "Imprimir o guardar", "Navegación de CYNDY", "Historial"],
+  ["es", "Detalles del conteo", "Imprimir o Guardar", "Navegación de CYNDY", "Historial"],
 ] as const) {
   test(`legacy detail prints historical data only on request (${locale})`, async ({ page }) => {
     await configureCountCurrencies(page);
@@ -77,19 +77,19 @@ for (const [locale, heading, action, navigation, history] of [
     }, locale);
     await page.goto(`/history/${id}/receipt`);
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-    await expect(page.getByText("Historical note Second line")).toBeVisible();
-    await expect(page.getByText("$1 × 3 = $3")).toBeVisible();
-    await expect(page.getByText("€2 × 4 = €8")).toBeVisible();
+    await expect(page.getByText("Historical note Second line")).toHaveCount(0);
+    await expect(page.getByRole("table", { name: "US dollar (USD)" })).toBeVisible();
+    await expect(page.getByRole("table", { name: "Euro (EUR)" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Return to history|Volver al historial/ })).toHaveCount(0);
     expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(0);
     await page.getByRole("button", { name: action }).click();
     expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(1);
     await page.emulateMedia({ media: "print" });
-    await expect(page.getByText("Historical note Second line")).toBeVisible();
-    await expect(page.getByText("$1 × 3 = $3")).toBeVisible();
+    await expect(page.getByText("Historical note Second line")).toHaveCount(0);
+    await expect(page.getByRole("table", { name: "US dollar (USD)" })).toBeVisible();
     await expect(page.getByRole("button", { name: action })).toBeHidden();
     await expect(page.locator(".bottom-nav")).toBeHidden();
-    expect(await page.locator(".detail-note").evaluate((node) => getComputedStyle(node).color)).toBe("rgb(0, 0, 0)");
+    expect(await page.locator(".detail-table").first().evaluate((node) => getComputedStyle(node).color)).toBe("rgb(0, 0, 0)");
     expect(await snapshotLocalData(page)).toEqual(before);
     await page.emulateMedia({ media: "screen" });
     await page.getByRole("navigation", { name: navigation }).getByRole("link", { name: history }).click();
@@ -165,7 +165,7 @@ function contrastRatio(foreground: string, background: string) {
 for (const theme of ["light", "dark"] as const) {
   test(`offline-ready status uses readable ledger colors in ${theme}`, async ({ page }) => {
     await page.addInitScript((value) => localStorage.setItem("cyndy.theme", value), theme);
-    await page.goto("/history");
+    await page.goto("/");
     const status = page.locator("#offline-ready");
     await expect(status).toBeVisible();
     await expect(status).toHaveAttribute("role", "status");
@@ -299,9 +299,9 @@ test("ledger rows align numeric values and accommodate extreme subtotals on mobi
   const row = input.locator("..");
   await expect(row.locator(".denomination-value")).toHaveText("20000");
   await expect(row.locator(".denomination-subtotal")).toHaveText("1999999980000");
-  await expect(input).toHaveCSS("text-align", "right");
-  await expect(row.locator(".denomination-value")).toHaveCSS("justify-content", "flex-end");
-  await expect(row.locator(".denomination-subtotal")).toHaveCSS("justify-content", "flex-end");
+  await expect(input).toHaveCSS("text-align", "center");
+  await expect(row.locator(".denomination-value")).toHaveCSS("justify-content", "center");
+  await expect(row.locator(".denomination-subtotal")).toHaveCSS("justify-content", "center");
   await expect(row.locator(".denomination-value")).toHaveCSS("background-color", "rgb(48, 42, 37)");
   const fit = await row.evaluate((node) => [...node.querySelectorAll<HTMLElement>(".denomination-value, input, .denomination-subtotal")].every((item) => item.scrollWidth <= item.clientWidth && item.scrollHeight <= item.clientHeight));
   expect(fit).toBe(true);
@@ -328,7 +328,7 @@ test("each currency total remains sticky within its own fieldset", async ({ page
     });
     expect(position.position).toBe("sticky");
     expect(position.top).toBeGreaterThanOrEqual(0);
-    expect(position.top).toBeLessThan(20);
+    expect(position.top).toBeLessThanOrEqual(68);
     expect(position.bottom).toBeLessThanOrEqual(position.fieldBottom);
   }
 });

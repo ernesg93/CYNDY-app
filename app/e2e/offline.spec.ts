@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("a controlled initial page can be closed and relaunched offline", async ({ context, page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Set up CYNDY" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect.poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null))
     .toContain("/service-worker.js");
@@ -13,7 +13,7 @@ test("a controlled initial page can be closed and relaunched offline", async ({ 
   const relaunchedPage = await context.newPage();
   await relaunchedPage.goto("/", { waitUntil: "domcontentloaded" });
 
-  await expect(relaunchedPage.getByRole("heading", { name: "Set up CYNDY" })).toBeVisible();
+  await expect(relaunchedPage.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(relaunchedPage.getByText("Offline access is ready.", { exact: false })).toBeVisible();
 });
 

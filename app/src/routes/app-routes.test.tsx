@@ -89,7 +89,7 @@ describe("count denomination order", () => {
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={routeRepository([validConfiguration, secondConfiguration])} />);
     await screen.findByRole("heading", { name: "New count" });
-    const fields = screen.getAllByRole("group");
+    const fields = screen.getAllByRole("group").filter((field) => within(field).queryAllByRole("spinbutton").length > 0);
     expect(within(fields[0]).getAllByRole("spinbutton").map((input) => input.getAttribute("aria-label"))).toEqual(["$5 quantity", "$1 quantity"]);
     expect(within(fields[1]).getAllByRole("spinbutton").map((input) => input.getAttribute("aria-label"))).toEqual(["€5 quantity", "€2 quantity"]);
   });
@@ -184,18 +184,12 @@ describe("duplicate count protection", () => {
 });
 
 describe("configuration routes", () => {
-  it.each(["/", "/count/new"])("renders guarded %s with replacement and focused status", async (path) => {
+  it.each(["/", "/count/new"])("initializes default currencies at %s", async (path) => {
     window.history.replaceState({}, "", path);
-    const replace = vi.spyOn(window.history, "replaceState");
-    render(<ApplicationRoutes repository={routeRepository()} />);
-
-    await screen.findByRole("heading", { name: "Set up CYNDY" });
-    const status = screen.getByRole("status");
-    expect(status.textContent).toBe("Add a valid currency before starting a count.");
-    await waitFor(() => {
-      expect(replace).toHaveBeenCalledWith({}, "", "/onboarding?reason=configuration");
-      expect(document.activeElement).toBe(status);
-    });
+    const store = routeRepository();
+    render(<ApplicationRoutes repository={store} />);
+    expect(await screen.findByRole("checkbox", { name: "USD" })).toBeTruthy();
+    expect(store.saveCurrencyConfigurations).toHaveBeenCalledOnce();
   });
 
   it("blocks navigation until every configured currency is valid", () => {
@@ -569,6 +563,17 @@ describe("application shell accessibility", () => {
     expect(setItem).toHaveBeenCalledWith("cyndy.locale", "es");
   });
 
+  it("focuses the destination without scrolling its start under the sticky header", async () => {
+    window.history.replaceState({}, "", "/count/new");
+    render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
+    await screen.findByRole("heading", { name: "New count" });
+    const main = screen.getByRole("main");
+    const focus = vi.spyOn(main, "focus");
+    fireEvent.click(screen.getByRole("link", { name: "Settings" }));
+    await screen.findByRole("heading", { name: "Settings" });
+    await waitFor(() => expect(focus).toHaveBeenCalledWith({ preventScroll: true }));
+  });
+
   it("puts an operable skip link first in keyboard order", async () => {
     render(<ApplicationRoutes repository={routeRepository([validConfiguration])} />);
     await screen.findByRole("heading", { name: "Dashboard" });
@@ -752,8 +757,8 @@ describe("new count route", () => {
     clear.focus();
     fireEvent.click(clear);
 
-    expect(invalidQuantity).toHaveProperty("value", "");
-    expect(secondInvalidQuantity).toHaveProperty("value", "");
+    expect(invalidQuantity).toHaveProperty("value", "0");
+    expect(secondInvalidQuantity).toHaveProperty("value", "0");
     expect(invalidQuantity.getAttribute("aria-invalid")).toBeNull();
     expect(note).toHaveProperty("value", "");
     expect(screen.queryByRole("alert")).toBeNull();

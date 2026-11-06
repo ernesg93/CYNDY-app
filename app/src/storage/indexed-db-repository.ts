@@ -30,7 +30,7 @@ export interface CountRepository {
   getLatestCount(): Promise<CountRecord | undefined>;
   updateCountNote(id: string, note?: string): Promise<CountRecord>;
   deleteCount(id: string): Promise<void>;
-  resetAll(): Promise<void>;
+  resetAll(configurations?: readonly CurrencyConfiguration[]): Promise<void>;
 }
 
 export interface IndexedDbRepositoryOptions {
@@ -61,7 +61,7 @@ export class IndexedDbRepository implements CountRepository {
     this.databaseName = options.databaseName ?? "cyndy";
     this.indexedDB = options.indexedDB ?? globalThis.indexedDB;
     this.now = options.now ?? (() => new Date());
-    this.createId = options.createId ?? (() => globalThis.crypto.randomUUID());
+    this.createId = options.createId ?? createCountId;
 
     if (!this.indexedDB) {
       throw new Error("IndexedDB is not available");
@@ -174,12 +174,19 @@ export class IndexedDbRepository implements CountRepository {
     return stored?.configurations ?? [];
   }
 
-  async resetAll(): Promise<void> {
+  async resetAll(configurations?: readonly CurrencyConfiguration[]): Promise<void> {
+    if (configurations) {
+      if (configurations.length === 0 || configurations.some((item) => validateCurrencyConfiguration(item).length > 0)) {
+        throw new TypeError("Invalid currency configurations");
+      }
+    }
     const transaction = (await this.open()).transaction(
       [SETTINGS_STORE, COUNTS_STORE],
       "readwrite",
     );
-    transaction.objectStore(SETTINGS_STORE).clear();
+    const settings = transaction.objectStore(SETTINGS_STORE);
+    settings.clear();
+    if (configurations) settings.put({ key: CURRENCY_CONFIGURATIONS_KEY, configurations: structuredClone(configurations) } satisfies StoredCurrencyConfigurations);
     transaction.objectStore(COUNTS_STORE).clear();
     await transactionComplete(transaction);
   }
@@ -219,6 +226,15 @@ export class IndexedDbRepository implements CountRepository {
     });
     return this.opening;
   }
+}
+
+function createCountId(): string {
+  if (typeof globalThis.crypto.randomUUID === "function") return globalThis.crypto.randomUUID();
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function validateSnapshots(snapshots: readonly CurrencyCountSnapshot[]): void {

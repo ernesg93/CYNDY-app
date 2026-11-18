@@ -36,6 +36,8 @@ The build requires no environment variables or server runtime. Vite writes the p
 
 `npm run test:e2e` builds and serves `dist`, then runs Chromium checks for warm and cold offline behavior, unknown routes, and the live Pages deployment. Install the local browser once with `npx playwright install chromium`.
 
+The CI workflow installs the locked dependencies, runs unit tests and the production build, and checks the local build in Chromium. It excludes the live Pages check because that test depends on the deployed site and network, not the pull request's build; run the full E2E command separately to check the deployment.
+
 ## Deployment
 
 The app is available at `https://cyndy-app.pages.dev`. Cloudflare Web Analytics is enabled and can receive page navigation and performance information when online; offline use is not a complete analytics source. Cloudflare Pages builds from `main` with `app` as the root directory, `npm run build` as the build command, and `dist` as the output directory. The deployment requires no environment variables, Pages Functions, Workers, bindings, deployment tokens, or vendor storage. Any replacement host only needs HTTPS, static-file serving, and an SPA fallback to `index.html`.

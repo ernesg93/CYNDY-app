@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    name: Unit, build and browser tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm test -- --run --no-file-parallelism
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Test the local build in Chromium
+        run: npm run test:e2e -- 'e2e/(?!live-pages\.spec\.ts)'

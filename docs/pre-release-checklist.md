@@ -4,13 +4,13 @@ Complete these user-owned settings before the first public release. The reposito
 
 ## GitHub repository
 
-- [ ] Confirm GitHub detects GPL-3.0 in the public repository. The repository was confirmed public on 2026-10-30.
-- [ ] Enable private vulnerability reporting.
-- [ ] Enable secret scanning and push protection.
-- [ ] Enable Dependabot alerts, security updates, and version updates.
+- [x] Confirm GitHub detects GPL-3.0 in the public repository. Confirmed 2026-11-18.
+- [x] Enable private vulnerability reporting. Confirmed 2026-11-18.
+- [x] Enable secret scanning and push protection. Confirmed 2026-11-18.
+- [x] Enable Dependabot alerts, security updates, and version updates. Confirmed 2026-11-18; no open alerts were returned at that time.
 - [ ] Confirm CodeQL remains enabled and succeeds for the release candidate. The latest `main` CodeQL run succeeded on 2026-10-29.
-- [ ] Protect `main`: require a pull request, at least one approval, conversation resolution, and passing required checks.
-- [ ] Prevent force pushes and branch deletion on `main`.
+- [ ] Protect `main`: require a pull request, conversation resolution, and passing required checks. The owner chose zero mandatory approvals; required checks still need configuration after CI is validated on GitHub.
+- [x] Prevent force pushes and branch deletion on `main`. Confirmed 2026-11-18.
 - [ ] Review tracked files and commit history for secrets, real user data, private exports, and sensitive media.
 
 ## Cloudflare Pages
@@ -28,7 +28,7 @@ Validated on 2026-10-15: `https://cyndy-app.pages.dev` deploys from GitHub `main
 ## Release evidence
 
 - [ ] Record the required status-check names after workflows exist.
-- [ ] Verify Android installation, warm-load offline behavior, and safe cold-first browser behavior.
-  - Automated Chromium evidence passed on 2026-10-15: the initial page became service-worker-controlled, a newly opened page loaded offline after the initial page closed, and a cold first visit failed safely without an in-app offline promise. Android installation and offline launch still require real-device validation.
+- [x] Verify Android installation, warm-load offline behavior, and safe cold-first browser behavior.
+  - Automated Chromium evidence passed on 2026-10-15: the initial page became service-worker-controlled, a newly opened page loaded offline after the initial page closed, and a cold first visit failed safely without an in-app offline promise. The owner confirmed installation, offline reopening and saved-count access on Android on 2026-11-18.
 - [x] Document rollback to a prior static build; device-local records are outside deployment rollback. See [release operation](release-operation.md).
 - [ ] Verify rollback on Android and the actual release deployment using synthetic records. An isolated Chromium test passed upgrade, offline reopening, rollback, and re-upgrade with a legacy note and a new title on 2026-10-30. The user also confirmed upgrade and offline reopening with both records on Android in an isolated incognito session.

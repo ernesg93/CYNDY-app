@@ -25,4 +25,4 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - name: Test the local build in Chromium
-        run: npm run test:e2e -- --grep-invert 'the Pages deployment serves HTTPS SPA direct routes'
+        run: npm run test:e2e -- 'e2e/(?!live-pages\.spec\.ts)'

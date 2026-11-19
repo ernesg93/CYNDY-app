@@ -2,6 +2,16 @@
 
 CYNDY is a static, Android-first PWA. A release changes the application shell, not the device-local IndexedDB records. Use synthetic data for verification.
 
+## Version automation (prepared, not activated)
+
+Cloudflare continues to deploy each merge to `main`; a GitHub Release is a separate version record, not a deployment gate. Release Please is disabled unless the repository variable `RELEASE_PLEASE_ENABLED` is explicitly set to `true`. Never enable it until the bootstrap proposal and first release process have been reviewed and authorized.
+
+The proposed baseline is `0.1.0`, with `69391483460502edc68c2b5747b8f474ab65ac68` as the verified starting point for changelog history. No release or tag exists yet. Release Please normally tags the merged release PR commit, not necessarily this baseline commit: review the exact commit and generated PR before deciding whether to publish. The empty manifest and initial `release-as` have not been validated against GitHub; do not treat them as a published version. The forced `release-as` must eventually be removed so later versions are not pinned to `0.1.0`; determine its safe removal point during the isolated bootstrap validation. Before 1.0, breaking changes are configured to bump the minor version; ordinary features also bump minor, and fixes bump patch.
+
+To prepare activation, the repository owner must create and install a GitHub App scoped to this repository, granting Contents, Issues, and Pull requests read and write as documented by Release Please. Set repository variable `RELEASE_PLEASE_APP_ID` to the App ID and repository secret `RELEASE_PLEASE_APP_PRIVATE_KEY` to its private key; never commit or share the key. The workflow mints an installation token and never falls back to `GITHUB_TOKEN`, because that token does not trigger the usual PR workflows. App creation, secret installation, activation, PR merge, tags and releases each require the appropriate owner authorization. Check that the generated PR receives the required CI and CodeQL checks before merging; do not weaken branch protection. Review changes to GitHub Actions settings separately if required.
+
+The workflow sets `skip-github-release: true` independently of activation: it cannot create a GitHub Release or tag through Release Please while this setting remains in place. Merging a proposed release PR does not authorize publication. A separately authorized change and verification would be required to enable publication; keep `release-as` in place until the first release has been resolved and validate the exact bootstrap sequence before changing either setting. The workflow and configuration require an isolated integration test before activation. No npm package publication is configured.
+
 ## Before release
 
 1. Run `cd app && npm test -- --run --no-file-parallelism`, `npm run build`, and `npm run test:e2e` with the installed Playwright Chromium path configured.

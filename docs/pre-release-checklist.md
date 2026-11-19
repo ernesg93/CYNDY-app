@@ -11,7 +11,7 @@ Complete these user-owned settings before the first public release. The reposito
 - [x] Confirm CodeQL remains enabled and succeeds for the release candidate. CodeQL passed on `main` at `6939148` on 2026-11-18.
 - [x] Protect `main`: require a pull request, conversation resolution, and passing required checks. Confirmed 2026-11-18: the required checks are `Unit, build and browser tests` and `CodeQL`; branches must be up to date, and zero approvals are required.
 - [x] Prevent force pushes and branch deletion on `main`. Confirmed 2026-11-18.
-- [ ] Review tracked files and commit history for secrets, real user data, private exports, and sensitive media.
+- [ ] Review tracked files and commit history for secrets, real user data, private exports, and sensitive media. On 2026-11-19, Gitleaks 8.30.1 scanned commits reachable from local refs with no findings; this pattern-based scan does not prove the absence of secrets or cover the other sensitive content categories.
 
 ## Cloudflare Pages
 

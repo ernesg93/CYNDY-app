@@ -23,7 +23,7 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertIn('client-id: ${{ vars.RELEASE_PLEASE_CLIENT_ID }}', workflow)
         self.assertIn('secrets.RELEASE_PLEASE_APP_PRIVATE_KEY', workflow)
         self.assertIn('steps.app-token.outputs.token', workflow)
-        self.assertIn('skip-github-release: true', workflow)
+        self.assertIn('skip-github-release: false', workflow)
         self.assertNotIn('pull_request_target:', workflow)
 
 

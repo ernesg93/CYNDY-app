@@ -18,7 +18,9 @@ class ReleaseConfigTests(unittest.TestCase):
     def test_workflow_requires_explicit_enable_and_app_credentials(self):
         workflow = (ROOT / '.github/workflows/release-please.yml').read_text()
         self.assertIn("vars.RELEASE_PLEASE_ENABLED == 'true'", workflow)
-        self.assertIn('actions/create-github-app-token@', workflow)
+        self.assertIn('actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc', workflow)
+        self.assertIn('googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7', workflow)
+        self.assertIn('client-id: ${{ vars.RELEASE_PLEASE_CLIENT_ID }}', workflow)
         self.assertIn('secrets.RELEASE_PLEASE_APP_PRIVATE_KEY', workflow)
         self.assertIn('steps.app-token.outputs.token', workflow)
         self.assertIn('skip-github-release: true', workflow)

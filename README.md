@@ -10,7 +10,7 @@ CYNDY is an Android-first, offline-capable MVP with device-local currency settin
 
 On a fresh installation, USD and CUP are ready to use. Select one or more currencies on the dashboard, then start a count; you can also change the selection while counting. A temporarily deselected currency keeps its draft quantities but is not included when the count is saved. Use Settings to add other currencies and denominations.
 
-Resetting local data removes saved counts and restores the default currencies.
+A count can have an optional title. Saved counts appear in History, where you can inspect or delete them and print or save a receipt. Older records may contain notes: those notes remain in local storage but are not displayed in the current count-details screen. Resetting local data removes saved counts and restores the default currencies.
 
 ## Product boundaries
 
@@ -26,17 +26,17 @@ The application lives in `app/`. CI runs on Node.js 24. The current lockfile inc
 ```sh
 cd app
 npm ci
-npm test -- --run src/domain
+npm test -- --run --no-file-parallelism
 npm run build
-npm run test:e2e
+npm run test:e2e -- 'e2e/(?!live-pages\.spec\.ts)'
 npm run dev
 ```
 
 The build requires no environment variables or server runtime. Vite writes the portable static artifact to `app/dist`.
 
-`npm run test:e2e` builds and serves `dist`, then runs Chromium checks for warm and cold offline behavior, unknown routes, and the live Pages deployment. Install the local browser once with `npx playwright install chromium`.
+The commands above run the full CI unit suite and the CI selection of local Chromium E2E tests. Playwright builds and serves `dist` before the browser tests. Install the local browser once with `npx playwright install chromium` (CI uses `npx playwright install --with-deps chromium`).
 
-The CI workflow installs the locked dependencies, runs unit tests and the production build, and checks the local build in Chromium. It excludes the live Pages check because that test depends on the deployed site and network, not the pull request's build; run the full E2E command separately to check the deployment.
+From `app/`, run `npm run test:e2e` to include all E2E tests, including the live Pages check, or `npm run test:e2e -- e2e/live-pages.spec.ts` to select that check. The live check depends on the deployed site and network, not the pull request's build; CI excludes it.
 
 ## Deployment
 

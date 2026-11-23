@@ -1,5 +1,7 @@
 # CYNDY redesign implementation plan
 
+**Historical status (2026-11-22):** This plan preserves the original proposed slices, decisions, and review gates. It is not a current progress checklist or evidence that all proposed or future work has been implemented; consult the application and current documentation for present behavior.
+
 This plan translates the four approved Android-first design artifacts into small, reviewable application slices. It preserves CYNDY as a self-contained module: no simulated parent host, no cloud features, and no new print workflow.
 
 ## Quick path

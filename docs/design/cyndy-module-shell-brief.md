@@ -1,6 +1,6 @@
 # CYNDY module shell — design brief
 
-**Status:** draft for product review
+**Historical status (2026-11-22):** This draft records the original product-review design direction and decisions; it is not a current implementation checklist. Later work may differ, and future-host proposals remain prospective.
 
 **Primary viewport:** Android compact (360 px); safe minimum 320 px; validate at 200% zoom.
 

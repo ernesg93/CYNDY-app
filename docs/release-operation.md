@@ -2,6 +2,18 @@
 
 CYNDY is a static, Android-first PWA. A release changes the application shell, not the device-local IndexedDB records. Use synthetic data for verification.
 
+## Version automation (prepared, not activated)
+
+Cloudflare continues to deploy each merge to `main`; a GitHub Release is a separate version record, not a deployment gate. Release Please is disabled unless the repository variable `RELEASE_PLEASE_ENABLED` is explicitly set to `true`. Never enable it until the bootstrap proposal and first release process have been reviewed and authorized.
+
+The proposed initial release is `0.1.0`, with `69391483460502edc68c2b5747b8f474ab65ac68` as the verified starting point for changelog history. No CYNDY release or tag exists yet. The owner chose to tag the merged release PR commit rather than this baseline commit; review the exact commit and generated PR before deciding whether to publish. The empty manifest and initial `release-as` were tested only in a synthetic repository; do not treat them as a published CYNDY version. The forced `release-as` must be removed after the initial release is resolved so later versions are not pinned to `0.1.0`. Before 1.0, breaking changes are configured to bump the minor version; ordinary features also bump minor, and fixes bump patch.
+
+To prepare activation, the repository owner must create and install a GitHub App scoped to this repository, granting Contents, Issues, and Pull requests read and write as documented by Release Please. Set repository variable `RELEASE_PLEASE_CLIENT_ID` to the App's Client ID and repository secret `RELEASE_PLEASE_APP_PRIVATE_KEY` to its private key; never commit or share the key. The workflow mints an installation token and never falls back to `GITHUB_TOKEN`, because that token does not trigger the usual PR workflows. App creation, secret installation, activation, PR merge, tags and releases each require the appropriate owner authorization. Check that the generated PR receives the required CI and CodeQL checks before merging; do not weaken branch protection. Review changes to GitHub Actions settings separately if required.
+
+The workflow sets `skip-github-release: false`: once automation is explicitly enabled, merging a release PR is the decision to publish its tag and GitHub Release. Review the proposed version, notes, required checks and target commit before merging; do not merge until ready to publish. A workflow run may also publish a previously merged, untagged release PR, so inspect existing release PRs and tags before activation or manual execution. In the isolated test, an untagged merged release PR blocked subsequent release proposals until publication was enabled. Keep `release-as` until the first release is resolved, then remove it so later versions can advance. Activation, each release PR merge and manual execution require appropriate owner authorization.
+
+In the isolated fixture, the initial PR was not created until a qualifying commit changed `app/` after the bootstrap SHA; the proposed version was `0.1.0`. After publishing that fixture release and removing `release-as`, a fix proposed `0.1.1`, a feature proposed `0.2.0`, and a breaking change proposed `0.3.0`; the synthetic lockfile was updated for `0.1.1`. These observations do not establish the exact initial PR, checks, or tag for CYNDY's actual history. Review those before activation and publication. No npm package publication is configured.
+
 ## Before release
 
 1. Run `cd app && npm test -- --run --no-file-parallelism`, `npm run build`, and `npm run test:e2e` with the installed Playwright Chromium path configured.

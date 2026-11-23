@@ -21,7 +21,7 @@ Resetting local data removes saved counts and restores the default currencies.
 
 ## Local development
 
-The application lives in `app/` and supports Node.js 22.12 LTS, 24, and later even-numbered releases.
+The application lives in `app/`. CI runs on Node.js 24. The current lockfile includes dependencies requiring Node.js 22.22.2 or later within Node 22, 24.15.0 or later within Node 24, or Node 26 or later. The application package declares the broader engine range `^22.12.0 || ^24.0.0 || >=26.0.0`; earlier versions within those ranges do not satisfy every locked dependency.
 
 ```sh
 cd app

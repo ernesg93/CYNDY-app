@@ -92,6 +92,61 @@ describe("stored count routes", () => {
     repository.close();
   });
 
+  it("does not resume after leaving details while draft preparation is pending", async () => {
+    const repository = await historyRepository();
+    const original = await repository.getCount("count-1");
+    const beforeDraft = await repository.getCountDraft();
+    const beforeHistory = await repository.listCounts();
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    const button = await screen.findByRole("button", { name: "Resume as new count" });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const read = repository.getCountDraft.bind(repository);
+    const delayed = vi.spyOn(repository, "getCountDraft").mockImplementationOnce(async () => { await gate; return read(); });
+    const save = vi.spyOn(repository, "saveCountDraft");
+    fireEvent.click(button);
+    await waitFor(() => expect(delayed).toHaveBeenCalled());
+    act(() => { window.history.pushState({}, "", "/settings"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await screen.findByRole("heading", { name: "Settings" });
+    const name = screen.getByLabelText("Currency name");
+    fireEvent.change(name, { target: { value: "Unsaved change" } });
+    await act(async () => { release(); await delayed.mock.results[0].value; });
+    expect(window.location.pathname).toBe("/settings");
+    expect(screen.getByLabelText("Currency name")).toHaveProperty("value", "Unsaved change");
+    expect(save).not.toHaveBeenCalled();
+    expect(await repository.getCountDraft()).toEqual(beforeDraft);
+    expect(await repository.getCount("count-1")).toEqual(original);
+    expect(await repository.listCounts()).toEqual(beforeHistory);
+    repository.close();
+  });
+
+  it("invalidates pending resume preparation after a countId round trip", async () => {
+    const repository = await historyRepository();
+    const beforeDraft = await repository.getCountDraft();
+    const beforeHistory = await repository.listCounts();
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    const button = await screen.findByRole("button", { name: "Resume as new count" });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const read = repository.getCountDraft.bind(repository);
+    const delayed = vi.spyOn(repository, "getCountDraft").mockImplementationOnce(async () => { await gate; return read(); });
+    const save = vi.spyOn(repository, "saveCountDraft");
+    fireEvent.click(button);
+    await waitFor(() => expect(delayed).toHaveBeenCalledTimes(1));
+    act(() => { window.history.pushState({}, "", "/history/count-2"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await screen.findByText("Total: $6 USD");
+    act(() => { window.history.pushState({}, "", "/history/count-1"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await screen.findByText("Total: $13 USD");
+    await act(async () => { release(); await delayed.mock.results[0].value; });
+    expect(save).not.toHaveBeenCalled();
+    expect(await repository.getCountDraft()).toEqual(beforeDraft);
+    expect(await repository.listCounts()).toEqual(beforeHistory);
+    expect(window.location.pathname).toBe("/history/count-1");
+    repository.close();
+  });
+
   it("protects an unfinished draft against navigation during an in-flight replacement", async () => {
     const repository = await historyRepository();
     await repository.saveCountDraft({ quantities: { "jpy:1000": "7" }, note: "Unfinished", selectedCurrencies: ["jpy"] });

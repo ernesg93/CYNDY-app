@@ -778,6 +778,12 @@ function CountDetailPage({ countId, repository, destination, prepareResume, resu
   const [resumeError, setResumeError] = useState(false);
   const [, setResuming] = useState(false);
   const resumeBusy = useRef(false);
+  const detailGeneration = useRef(0);
+  useEffect(() => {
+    ++detailGeneration.current;
+    resumeBusy.current = false;
+    return () => { ++detailGeneration.current; };
+  }, [countId]);
   const [deleteError, setDeleteError] = useState<string>();
   const [deleted, setDeleted] = useState(false);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
@@ -807,10 +813,16 @@ function CountDetailPage({ countId, repository, destination, prepareResume, resu
     <button type="button" onClick={() => {
       if (resumeBusy.current) return;
       resumeBusy.current = true; setResuming(true); setResumeError(false);
+      const origin = `${window.location.pathname}${window.location.search}`;
+      const generation = detailGeneration.current;
+      const isCurrent = () => detailGeneration.current === generation && `${window.location.pathname}${window.location.search}` === origin;
       void prepareResume().then(async (result) => {
+        if (!isCurrent()) return;
         if (result.needsConfirmation) setPrepared(result);
         else await resume(record, result);
-      }).catch(() => setResumeError(true)).finally(() => { resumeBusy.current = false; setResuming(false); });
+      }).catch(() => { if (isCurrent()) setResumeError(true); }).finally(() => {
+        if (isCurrent()) { resumeBusy.current = false; setResuming(false); }
+      });
     }}>{t("Resume as new count")}</button>
     {resumeError && <p role="alert" className="error">{t("Could not resume the count. Your draft and saved count were kept. Refresh and try again.")}</p>}
     {prepared && <ConfirmationPanel title="Replace unfinished count?" description="The unfinished draft will be replaced. The saved count will remain unchanged." cancelLabel="Cancel" confirmLabel="Replace draft" onCancel={() => setPrepared(undefined)} onConfirm={() => {

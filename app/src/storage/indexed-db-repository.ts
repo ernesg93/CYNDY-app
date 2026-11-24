@@ -8,6 +8,14 @@ const DATABASE_VERSION = 1;
 const COUNTS_STORE = "counts";
 const SETTINGS_STORE = "settings";
 const CURRENCY_CONFIGURATIONS_KEY = "currency-configurations";
+const COUNT_DRAFT_KEY = "count-draft";
+
+export interface CountDraft {
+  readonly quantities: Readonly<Record<string, string>>;
+  readonly note: string;
+  readonly selectedCurrencies: readonly string[];
+  readonly historicalConfigurations?: readonly CurrencyConfiguration[];
+}
 
 export interface CountRecord {
   readonly id: string;
@@ -174,6 +182,46 @@ export class IndexedDbRepository implements CountRepository {
     return stored?.configurations ?? [];
   }
 
+  async getCountDraft(): Promise<(CountDraft & { readonly revision: string }) | { readonly cleared: true; readonly revision: string } | undefined> {
+    const transaction = (await this.open()).transaction(SETTINGS_STORE, "readonly");
+    const stored = await requestResult<unknown>(transaction.objectStore(SETTINGS_STORE).get(COUNT_DRAFT_KEY));
+    await transactionComplete(transaction);
+    if (stored === undefined) return undefined;
+    if (!isStoredDraft(stored)) throw new Error("Unsupported or invalid count draft");
+    if (stored.version === 3) return { cleared: true, revision: stored.revision };
+    return { ...structuredClone(stored.draft), revision: draftRevision(stored) };
+  }
+
+  async saveCountDraft(draft: CountDraft, revision = createDraftRevision(), expectedRevision?: string | null): Promise<void> {
+    const transaction = (await this.open()).transaction(SETTINGS_STORE, "readwrite");
+    const store = transaction.objectStore(SETTINGS_STORE);
+    const existing = await requestResult<unknown>(store.get(COUNT_DRAFT_KEY));
+    if (existing !== undefined && !isStoredDraft(existing)) {
+      await transactionComplete(transaction);
+      throw new Error("Unsupported or invalid count draft");
+    }
+    if (expectedRevision !== undefined && (existing === undefined ? expectedRevision !== null : draftRevision(existing as StoredDraft) !== expectedRevision)) {
+      await transactionComplete(transaction);
+      throw new Error("Count draft changed in another session");
+    }
+    store.put({ key: COUNT_DRAFT_KEY, version: draft.historicalConfigurations ? 4 : 2, revision, draft: structuredClone(draft) });
+    await transactionComplete(transaction);
+  }
+
+  async deleteCountDraft(expectedRevision?: string | null, nextRevision = createDraftRevision()): Promise<string | null> {
+    const transaction = (await this.open()).transaction(SETTINGS_STORE, "readwrite");
+    const store = transaction.objectStore(SETTINGS_STORE);
+    const existing = await requestResult<unknown>(store.get(COUNT_DRAFT_KEY));
+    if (existing !== undefined && !isStoredDraft(existing)) {
+      await transactionComplete(transaction);
+      throw new Error("Unsupported or invalid count draft");
+    }
+    const matches = expectedRevision === undefined || (existing === undefined ? expectedRevision === null : draftRevision(existing as StoredDraft) === expectedRevision);
+    if (matches) store.put({ key: COUNT_DRAFT_KEY, version: 3, revision: nextRevision });
+    await transactionComplete(transaction);
+    return matches ? nextRevision : null;
+  }
+
   async resetAll(configurations?: readonly CurrencyConfiguration[]): Promise<void> {
     if (configurations) {
       if (configurations.length === 0 || configurations.some((item) => validateCurrencyConfiguration(item).length > 0)) {
@@ -186,6 +234,7 @@ export class IndexedDbRepository implements CountRepository {
     );
     const settings = transaction.objectStore(SETTINGS_STORE);
     settings.clear();
+    settings.put({ key: COUNT_DRAFT_KEY, version: 3, revision: createDraftRevision() });
     if (configurations) settings.put({ key: CURRENCY_CONFIGURATIONS_KEY, configurations: structuredClone(configurations) } satisfies StoredCurrencyConfigurations);
     transaction.objectStore(COUNTS_STORE).clear();
     await transactionComplete(transaction);
@@ -226,6 +275,41 @@ export class IndexedDbRepository implements CountRepository {
     });
     return this.opening;
   }
+}
+
+type StoredDraft = { key: string; version: 1; draft: CountDraft } | { key: string; version: 2 | 4; revision: string; draft: CountDraft } | { key: string; version: 3; revision: string };
+
+function draftRevision(stored: StoredDraft): string {
+  return stored.version !== 1 ? stored.revision : `legacy:${JSON.stringify(stored.draft)}`;
+}
+
+export function createDraftRevision(): string { return createCountId(); }
+
+function isStoredDraft(value: unknown): value is StoredDraft {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort().join(",");
+  if (record.key !== COUNT_DRAFT_KEY || !((record.version === 1 && keys === "draft,key,version")
+    || (record.version === 2 && keys === "draft,key,revision,version" && typeof record.revision === "string" && record.revision.length > 0)
+    || (record.version === 3 && keys === "key,revision,version" && typeof record.revision === "string" && record.revision.length > 0)
+    || (record.version === 4 && keys === "draft,key,revision,version" && typeof record.revision === "string" && record.revision.length > 0))) return false;
+  if (record.version === 3) return true;
+  const draft = record.draft;
+  if (!draft || typeof draft !== "object" || Array.isArray(draft)) return false;
+  const fields = draft as Record<string, unknown>;
+  if (Object.keys(fields).sort().join(",") !== (record.version === 4 ? "historicalConfigurations,note,quantities,selectedCurrencies" : "note,quantities,selectedCurrencies") || typeof fields.note !== "string"
+    || !Array.isArray(fields.selectedCurrencies) || !fields.selectedCurrencies.every((id) => typeof id === "string")
+    || !fields.quantities || typeof fields.quantities !== "object" || Array.isArray(fields.quantities)) return false;
+  if (record.version === 4) {
+    if (!Array.isArray(fields.historicalConfigurations) || fields.historicalConfigurations.length === 0) return false;
+    for (const item of fields.historicalConfigurations) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      const currency = item as Record<string, unknown>;
+      if (typeof currency.id !== "string" || typeof currency.name !== "string" || typeof currency.symbol !== "string" || typeof currency.code !== "string" || !Array.isArray(currency.denominations) || !currency.denominations.every((n) => typeof n === "number")) return false;
+      if (validateCurrencyConfiguration(currency as unknown as CurrencyConfiguration).length) return false;
+    }
+  }
+  return Object.values(fields.quantities).every((quantity) => typeof quantity === "string");
 }
 
 function createCountId(): string {

@@ -38,6 +38,9 @@ function repository() {
 function routeRepository(configurations: readonly CurrencyConfiguration[] = []) {
   return {
     getCurrencyConfigurations: vi.fn().mockResolvedValue(configurations),
+    getCountDraft: vi.fn().mockResolvedValue(undefined),
+    saveCountDraft: vi.fn().mockResolvedValue(undefined),
+    deleteCountDraft: vi.fn().mockResolvedValue("cleared-revision"),
     saveCurrencyConfigurations: vi.fn().mockResolvedValue(undefined),
     saveCount: vi.fn().mockResolvedValue(undefined),
     listCounts: vi.fn().mockResolvedValue([]),
@@ -46,14 +49,14 @@ function routeRepository(configurations: readonly CurrencyConfiguration[] = []) 
 }
 
 function validValues(): ConfigurationFormValues {
-  return { name: "US dollar", symbol: "$", code: "USD", denominations: "1, 5" };
+  return { name: "US dollar", symbol: "$", code: "USD", denominations: "1; 5" };
 }
 
 function fill(values: ConfigurationFormValues) {
   fireEvent.change(screen.getByLabelText("Currency name"), { target: { value: values.name } });
   fireEvent.change(screen.getByLabelText("Symbol"), { target: { value: values.symbol } });
   fireEvent.change(screen.getByLabelText("Currency code"), { target: { value: values.code } });
-  fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
+  fireEvent.change(screen.getByLabelText("Denominations (semicolon separated)"), {
     target: { value: values.denominations },
   });
 }
@@ -89,9 +92,9 @@ describe("count denomination order", () => {
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={routeRepository([validConfiguration, secondConfiguration])} />);
     await screen.findByRole("heading", { name: "New count" });
-    const fields = screen.getAllByRole("group").filter((field) => within(field).queryAllByRole("spinbutton").length > 0);
-    expect(within(fields[0]).getAllByRole("spinbutton").map((input) => input.getAttribute("aria-label"))).toEqual(["$5 quantity", "$1 quantity"]);
-    expect(within(fields[1]).getAllByRole("spinbutton").map((input) => input.getAttribute("aria-label"))).toEqual(["€5 quantity", "€2 quantity"]);
+    const fields = screen.getAllByRole("group").filter((field) => within(field).queryAllByRole("textbox").length > 0);
+    expect(within(fields[0]).getAllByRole("textbox").map((input) => input.getAttribute("aria-label"))).toEqual(["$5 quantity", "$1 quantity"]);
+    expect(within(fields[1]).getAllByRole("textbox").map((input) => input.getAttribute("aria-label"))).toEqual(["€5 quantity", "€2 quantity"]);
   });
 });
 
@@ -101,7 +104,7 @@ describe("count quantity limit", () => {
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
-    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("$9,007,199,254,740,991 quantity"), { target: { value: "2" } });
     expect(screen.getByText("The count total exceeds the supported range.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
     expect(store.saveCount).not.toHaveBeenCalled();
@@ -118,7 +121,7 @@ describe("count quantity limit", () => {
     await screen.findByText("Count saved.");
     expect(store.saveCount).toHaveBeenCalledTimes(1);
     fireEvent.change(input, { target: { value: "999999999" } });
-    expect(input).toHaveProperty("value", "99999999");
+    expect(input).toHaveProperty("value", "99,999,999");
     expect(screen.getByText("Maximum 8 digits; the previous value was kept.")).toBeTruthy();
     expect(store.saveCount).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Count saved.")).toBeTruthy();
@@ -206,11 +209,11 @@ describe("configuration routes", () => {
     window.history.replaceState({}, "", "/onboarding");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "Set up CYNDY" });
-    fill({ ...validValues(), denominations: "5, 1.5" });
+    fill({ ...validValues(), denominations: "5; 1.5" });
     fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
 
     expect(await screen.findByText("Denominations must be positive integers.")).toBeTruthy();
-    expect(screen.getByLabelText("Denominations (comma separated)")).toHaveProperty("value", "5, 1.5");
+    expect(screen.getByLabelText("Denominations (semicolon separated)")).toHaveProperty("value", "5; 1.5");
     expect(store.saveCurrencyConfigurations).not.toHaveBeenCalled();
   });
 
@@ -250,7 +253,7 @@ describe("configuration routes", () => {
 
     const alert = await screen.findByText("Could not save local settings. Try again.");
     expect(screen.queryByText("Denominations must be positive integers.")).toBeNull();
-    expect(screen.getByLabelText("Denominations (comma separated)").getAttribute("aria-invalid")).toBeNull();
+    expect(screen.getByLabelText("Denominations (semicolon separated)").getAttribute("aria-invalid")).toBeNull();
     await waitFor(() => expect(document.activeElement).toBe(alert));
   });
 
@@ -283,11 +286,11 @@ describe("configuration routes", () => {
     const names = screen.getAllByLabelText("Currency name");
     const symbols = screen.getAllByLabelText("Symbol");
     const codes = screen.getAllByLabelText("Currency code");
-    const denominations = screen.getAllByLabelText("Denominations (comma separated)");
+    const denominations = screen.getAllByLabelText("Denominations (semicolon separated)");
     fireEvent.change(names[1], { target: { value: "Euro" } });
     fireEvent.change(symbols[1], { target: { value: "€" } });
     fireEvent.change(codes[1], { target: { value: "EUR" } });
-    fireEvent.change(denominations[1], { target: { value: "2, 5" } });
+    fireEvent.change(denominations[1], { target: { value: "2; 5" } });
     fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
 
     await waitFor(() => expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy());
@@ -307,11 +310,11 @@ describe("configuration routes", () => {
     const names = screen.getAllByLabelText("Currency name");
     const symbols = screen.getAllByLabelText("Symbol");
     const codes = screen.getAllByLabelText("Currency code");
-    const denominations = screen.getAllByLabelText("Denominations (comma separated)");
+    const denominations = screen.getAllByLabelText("Denominations (semicolon separated)");
     fireEvent.change(names[1], { target: { value: "Duplicate dollar" } });
     fireEvent.change(symbols[1], { target: { value: "US$" } });
     fireEvent.change(codes[1], { target: { value: " usd " } });
-    fireEvent.change(denominations[1], { target: { value: "1, 10" } });
+    fireEvent.change(denominations[1], { target: { value: "1; 10" } });
     fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
 
     expect(await screen.findAllByText("Currency codes must be unique.")).toHaveLength(2);
@@ -326,7 +329,7 @@ describe("configuration routes", () => {
 
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeTruthy();
     expect(screen.getByLabelText("Currency name")).toHaveProperty("value", "US dollar");
-    expect(screen.getByLabelText("Denominations (comma separated)")).toHaveProperty("value", "");
+    expect(screen.getByLabelText("Denominations (semicolon separated)")).toHaveProperty("value", "");
     expect(window.location.pathname).toBe("/settings");
   });
 
@@ -340,8 +343,8 @@ describe("configuration routes", () => {
     window.history.replaceState({}, "", "/settings");
     const view = render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "Settings" });
-    fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
-      target: { value: "10, 20" },
+    fireEvent.change(screen.getByLabelText("Denominations (semicolon separated)"), {
+      target: { value: "10; 20" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
 
@@ -359,10 +362,10 @@ describe("configuration routes", () => {
 
   it("preserves the unsaved count draft while settings are opened and saved", async () => {
     const store = routeRepository([validConfiguration]);
+    vi.mocked(store.getCountDraft).mockResolvedValue({ revision: "legacy", quantities: { "usd:1": "-1" }, note: "", selectedCurrencies: ["usd"] });
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
-    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "-1" } });
     fireEvent.change(screen.getByLabelText("Count title"), {
       target: { value: "Unsaved note" },
     });
@@ -391,8 +394,8 @@ describe("configuration routes", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
     expect((await screen.findByRole("status")).textContent).toBe("Settings saved.");
 
-    fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
-      target: { value: "10, 20" },
+    fireEvent.change(screen.getByLabelText("Denominations (semicolon separated)"), {
+      target: { value: "10; 20" },
     });
 
     expect(screen.queryByRole("status")).toBeNull();
@@ -404,12 +407,12 @@ describe("configuration routes", () => {
     window.history.replaceState({}, "", "/settings");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "Settings" });
-    const denominations = screen.getByLabelText("Denominations (comma separated)");
-    fireEvent.change(denominations, { target: { value: "5, 5" } });
+    const denominations = screen.getByLabelText("Denominations (semicolon separated)");
+    fireEvent.change(denominations, { target: { value: "5; 5" } });
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
 
     expect(await screen.findByText("Denominations must be unique.")).toBeTruthy();
-    expect(denominations).toHaveProperty("value", "5, 5");
+    expect(denominations).toHaveProperty("value", "5; 5");
     expect(denominations.getAttribute("aria-invalid")).toBe("true");
     expect(denominations.getAttribute("aria-describedby")).toBe("currency-0-denominations-error");
     await waitFor(() => expect(document.activeElement).toBe(denominations));
@@ -465,7 +468,7 @@ describe("application shell accessibility", () => {
     const store = routeRepository();
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "Configura CYNDY" });
-    fireEvent.change(screen.getByLabelText("Denominaciones (separadas por comas)"), {
+    fireEvent.change(screen.getByLabelText("Denominaciones (separadas por punto y coma)"), {
       target: { value: "1.5" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
@@ -685,9 +688,7 @@ describe("new count route", () => {
     expect(within(euros).getByText("€ 13 EUR")).toBeTruthy();
     expect(within(dollars).queryByRole("status")).toBeNull();
     const quantity = screen.getByLabelText("$1 quantity");
-    expect(quantity.getAttribute("type")).toBe("number");
-    expect(quantity.getAttribute("min")).toBe("0");
-    expect(quantity.getAttribute("step")).toBe("1");
+    expect(quantity.getAttribute("type")).toBe("text");
     expect(quantity.getAttribute("inputmode")).toBe("numeric");
     expect(document.body.textContent).not.toMatch(/combined total|conversion|exchange|receipt|reconciliation/i);
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
@@ -718,33 +719,36 @@ describe("new count route", () => {
     });
   });
 
-  it.each(["-1", "1.5"])("rejects invalid quantity %s", async (quantity) => {
+  it.each(["-1", "1.5"])("preserves and rejects a restored invalid quantity %s until corrected", async (quantity) => {
     const store = routeRepository([validConfiguration, secondConfiguration]);
+    vi.mocked(store.getCountDraft).mockResolvedValue({ revision: "legacy", quantities: { "usd:1": quantity }, note: "", selectedCurrencies: ["usd", "eur"] });
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
     const input = screen.getByLabelText("$1 quantity");
-    fireEvent.change(input, { target: { value: quantity } });
+    expect(input).toHaveProperty("value", quantity);
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
 
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "Quantities must be non-negative integers.",
-    );
+    expect((await screen.findByRole("alert")).textContent).toBe("Quantities must be non-negative integers.");
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(input.getAttribute("aria-describedby")).toBe("usd:1-subtotal-description usd:1-error");
     expect(store.saveCount).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "2" } });
+    expect(input.getAttribute("aria-invalid")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await screen.findByText("Count saved.");
+    expect(store.saveCount).toHaveBeenCalledTimes(1);
   });
 
   it("clears only the unsaved draft and transient feedback without persistence", async () => {
     const store = routeRepository([validConfiguration, secondConfiguration]);
+    vi.mocked(store.getCountDraft).mockResolvedValue({ revision: "legacy", quantities: { "usd:1": "-1", "eur:2": "1.5" }, note: "", selectedCurrencies: ["usd", "eur"] });
     window.history.replaceState({}, "", "/count/new");
     render(<ApplicationRoutes repository={store} />);
     await screen.findByRole("heading", { name: "New count" });
     const invalidQuantity = screen.getByLabelText("$1 quantity");
     const secondInvalidQuantity = screen.getByLabelText("€2 quantity");
     const note = screen.getByLabelText("Count title");
-    fireEvent.change(invalidQuantity, { target: { value: "-1" } });
-    fireEvent.change(secondInvalidQuantity, { target: { value: "1.5" } });
     fireEvent.change(note, { target: { value: "Unsaved note" } });
     fireEvent.click(screen.getByRole("button", { name: "Save count" }));
     expect(await screen.findByRole("alert")).toBeTruthy();

@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { IDBFactory } from "fake-indexeddb";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { calculateCountSnapshots } from "../domain/count";
 import type { CurrencyConfiguration } from "../domain/validation";
@@ -25,7 +25,7 @@ async function historyRepository() {
     databaseName: crypto.randomUUID(),
     indexedDB: new IDBFactory(),
     createId: () => `count-${++sequence}`,
-    now: () => new Date(dates[sequence - 1]),
+    now: () => new Date(dates[sequence - 1] ?? dates[1]),
   });
   await repository.saveCurrencyConfigurations([dollar, euro]);
   await repository.saveCount({
@@ -51,6 +51,180 @@ function expectNeutralLanguage() {
 }
 
 describe("stored count routes", () => {
+  it("resumes a saved count as a historical draft", async () => {
+    const repository = await historyRepository();
+    const original = await repository.getCount("count-1");
+    window.history.replaceState({}, "", "/history/count-1");
+    const view = render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    expect(await screen.findByLabelText("$1 quantity")).toHaveProperty("value", "3");
+    expect(screen.getByLabelText("€2 quantity")).toHaveProperty("value", "4");
+    expect(screen.getByRole("group", { name: "US dollar (USD)" })).toBeTruthy();
+    view.unmount();
+    render(<ApplicationRoutes repository={repository} />);
+    expect(await screen.findByLabelText("$1 quantity")).toHaveProperty("value", "3");
+    expect(screen.getByLabelText("€2 quantity")).toHaveProperty("value", "4");
+    fireEvent.change(screen.getByLabelText("$1 quantity"), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await screen.findByText("Count saved.");
+    const copy = await repository.getCount("count-3");
+    expect(copy?.snapshots.map((snapshot) => snapshot.name)).toEqual(["US dollar", "Euro"]);
+    expect(copy?.snapshots[0].entries[0].quantity).toBe(9);
+    expect(await repository.getCount("count-1")).toEqual(original);
+    repository.close();
+  });
+  it("confirms before replacing an unfinished draft and preserves it on cancel", async () => {
+    const repository = await historyRepository();
+    await repository.saveCountDraft({ quantities: { "jpy:1000": "invalid" }, note: "Unfinished", selectedCurrencies: ["jpy"] });
+    const before = await repository.getCountDraft();
+    const original = await repository.getCount("count-1");
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    expect(await screen.findByRole("alertdialog", { name: "Replace unfinished count?" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(await repository.getCountDraft()).toEqual(before);
+    expect(await repository.getCount("count-1")).toEqual(original);
+    fireEvent.click(screen.getByRole("button", { name: "Resume as new count" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Replace draft" }));
+    expect(await screen.findByLabelText("$1 quantity")).toHaveProperty("value", "3");
+    expect(await repository.getCount("count-1")).toEqual(original);
+    repository.close();
+  });
+
+  it("protects an unfinished draft against navigation during an in-flight replacement", async () => {
+    const repository = await historyRepository();
+    await repository.saveCountDraft({ quantities: { "jpy:1000": "7" }, note: "Unfinished", selectedCurrencies: ["jpy"] });
+    const before = JSON.stringify(await repository.getCountDraft());
+    const original = JSON.stringify(await repository.getCount("count-1"));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const save = vi.spyOn(repository, "saveCountDraft").mockImplementationOnce(async () => { await gate; throw new Error("write failed"); });
+    window.history.replaceState({}, "", "/history/count-1");
+    render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Replace draft" }));
+    await waitFor(() => expect(save).toHaveBeenCalled());
+    act(() => { window.history.pushState({}, "", "/count/new"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    expect(screen.queryByLabelText("¥1,000 quantity")).toBeNull();
+    await act(async () => { release(); });
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(JSON.stringify(await repository.getCountDraft())).toBe(before);
+    expect(JSON.stringify(await repository.getCount("count-1"))).toBe(original);
+    repository.close();
+  });
+
+  it("keeps another owner's newer draft when replacement is delayed", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = crypto.randomUUID();
+    const repository = new IndexedDbRepository({ indexedDB, databaseName });
+    const other = new IndexedDbRepository({ indexedDB, databaseName });
+    await repository.saveCurrencyConfigurations([dollar]);
+    const record = await repository.saveCount({ snapshots: calculateCountSnapshots([dollar], { usd: { "1": 3 } }) });
+    await repository.saveCountDraft({ quantities: { "usd:1": "7" }, note: "Before", selectedCurrencies: ["usd"] });
+    const before = await repository.getCountDraft();
+    const original = JSON.stringify(await repository.getCount(record.id));
+    const write = repository.saveCountDraft.bind(repository);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const delayed = vi.spyOn(repository, "saveCountDraft").mockImplementationOnce(async (...args) => { await gate; await write(...args); });
+    window.history.replaceState({}, "", `/history/${record.id}`);
+    render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Replace draft" }));
+    await waitFor(() => expect(delayed).toHaveBeenCalled());
+    await other.saveCountDraft({ quantities: { "usd:1": "42" }, note: "Newer", selectedCurrencies: ["usd"] }, "other-revision", before?.revision);
+    const newer = JSON.stringify(await other.getCountDraft());
+    await act(async () => { release(); });
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(JSON.stringify(await other.getCountDraft())).toBe(newer);
+    expect(JSON.stringify(await other.getCount(record.id))).toBe(original);
+    repository.close(); other.close();
+  });
+
+  it("preserves both owners' draft and saved history after an actual replacement transaction abort", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = crypto.randomUUID();
+    const repository = new IndexedDbRepository({ indexedDB, databaseName });
+    const other = new IndexedDbRepository({ indexedDB, databaseName });
+    await repository.saveCurrencyConfigurations([dollar]);
+    const record = await repository.saveCount({ snapshots: calculateCountSnapshots([dollar], { usd: { "1": 3 } }) });
+    await repository.saveCountDraft({ quantities: { "usd:1": "7" }, note: "Original draft", selectedCurrencies: ["usd"] });
+    const beforeDraft = await other.getCountDraft();
+    const beforeHistory = await other.listCounts();
+    window.history.replaceState({}, "", `/history/${record.id}`);
+    render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    await screen.findByRole("alertdialog", { name: "Replace unfinished count?" });
+    const put = IDBObjectStore.prototype.put;
+    let aborted = false;
+    const spy = vi.spyOn(IDBObjectStore.prototype, "put").mockImplementation(function (this: IDBObjectStore, value: unknown, key?: IDBValidKey) {
+      const request = put.call(this, value, key);
+      if ((value as { version?: number })?.version === 4) { aborted = true; this.transaction.abort(); }
+      return request;
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Replace draft" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Could not resume the count. Your draft and saved count were kept. Refresh and try again.");
+    expect(aborted).toBe(true);
+    expect(screen.queryByLabelText("$1 quantity")).toBeNull();
+    expect(await other.getCountDraft()).toEqual(beforeDraft);
+    expect(await other.listCounts()).toEqual(beforeHistory);
+    expect(await repository.getCountDraft()).toEqual(beforeDraft);
+    spy.mockRestore(); repository.close(); other.close();
+  });
+
+  it.each(["unchanged", "changed"]) ("copies the historical configuration when current settings are %s", async (mode) => {
+    const indexedDB = new IDBFactory();
+    let sequence = 0;
+    const repository = new IndexedDbRepository({ indexedDB, databaseName: crypto.randomUUID(), createId: () => `item-${++sequence}` });
+    await repository.saveCurrencyConfigurations([dollar, euro]);
+    const original = await repository.saveCount({ snapshots: calculateCountSnapshots([dollar, euro], { usd: { "1": 3, "5": 2 }, eur: { "2": 4 } }), title: "Original" });
+    if (mode === "changed") await repository.saveCurrencyConfigurations([{ ...dollar, name: "New dollar", symbol: "£", denominations: [10] }]);
+    window.history.replaceState({}, "", `/history/${original.id}`);
+    const view = render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    expect(await screen.findByLabelText("$1 quantity")).toHaveProperty("value", "3");
+    expect(screen.getByLabelText("$5 quantity")).toHaveProperty("value", "2");
+    expect(screen.getByLabelText("€2 quantity")).toHaveProperty("value", "4");
+    expect(screen.queryByLabelText("£10 quantity")).toBeNull();
+    view.unmount();
+    render(<ApplicationRoutes repository={repository} />);
+    expect(await screen.findByLabelText("€2 quantity")).toHaveProperty("value", "4");
+    fireEvent.click(screen.getByRole("button", { name: "Save count" }));
+    await screen.findByText("Count saved.");
+    expect((await repository.getCount("item-2"))?.snapshots).toEqual(original.snapshots);
+    expect(await repository.getCount(original.id)).toEqual(original);
+    repository.close();
+  });
+
+  it("preserves a version-one draft with invalid values when replacement is canceled", async () => {
+    const indexedDB = new IDBFactory();
+    const databaseName = crypto.randomUUID();
+    const repository = new IndexedDbRepository({ indexedDB, databaseName });
+    await repository.saveCurrencyConfigurations([dollar]);
+    const original = await repository.saveCount({ snapshots: calculateCountSnapshots([dollar], {}) });
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(databaseName, 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const legacy = { key: "count-draft", version: 1, draft: { quantities: { "usd:1": "invalid" }, note: "Legacy", selectedCurrencies: ["usd"] } };
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction("settings", "readwrite");
+      transaction.objectStore("settings").put(legacy);
+      transaction.oncomplete = () => resolve();
+      transaction.onabort = () => reject(transaction.error);
+    });
+    const before = await repository.getCountDraft();
+    window.history.replaceState({}, "", `/history/${original.id}`);
+    render(<ApplicationRoutes repository={repository} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Resume as new count" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(await repository.getCountDraft()).toEqual(before);
+    expect(await repository.getCount(original.id)).toEqual(original);
+    db.close(); repository.close();
+  });
+
   it("shows the latest saved snapshot and per-currency local statistics", async () => {
     render(<ApplicationRoutes repository={await historyRepository()} />);
 
@@ -200,8 +374,8 @@ describe("stored count routes", () => {
     expect(within(page!).getByText(
       "Edit the currencies and positive whole-number denominations used by future counts.",
     ).classList.contains("settings-intro")).toBe(true);
-    const denominations = screen.getByLabelText("Denominations (comma separated)");
-    fireEvent.change(denominations, { target: { value: "5, 5" } });
+    const denominations = screen.getByLabelText("Denominations (semicolon separated)");
+    fireEvent.change(denominations, { target: { value: "5; 5" } });
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
 
     const error = await screen.findByText("Denominations must be unique.");
@@ -286,8 +460,8 @@ describe("stored count routes", () => {
     fireEvent.change(screen.getByLabelText("Currency name"), { target: { value: "US dollar" } });
     fireEvent.change(screen.getByLabelText("Symbol"), { target: { value: "$" } });
     fireEvent.change(screen.getByLabelText("Currency code"), { target: { value: "USD" } });
-    fireEvent.change(screen.getByLabelText("Denominations (comma separated)"), {
-      target: { value: "1, 5" },
+    fireEvent.change(screen.getByLabelText("Denominations (semicolon separated)"), {
+      target: { value: "1; 5" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save configuration" }));
     await screen.findByRole("heading", { name: "Dashboard" });

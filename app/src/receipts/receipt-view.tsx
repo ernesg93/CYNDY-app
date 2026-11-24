@@ -1,3 +1,4 @@
+import { formatNumber } from "../domain/format-number";
 import type { CountRecord } from "../storage/indexed-db-repository";
 import type { ReceiptDestination } from "./receipt-destination";
 
@@ -11,9 +12,9 @@ export function ReceiptView({ record, destination }: {
       {record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
         <h2>{snapshot.name} ({snapshot.code})</h2>
         <ul>{snapshot.entries.map((entry) => <li key={entry.denomination}>
-          {snapshot.symbol}{entry.denomination} × {entry.quantity} = {snapshot.symbol}{entry.total}
+          {snapshot.symbol}{formatNumber(entry.denomination)} × {formatNumber(entry.quantity)} = {snapshot.symbol}{formatNumber(entry.total)}
         </li>)}</ul>
-        <p>Subtotal: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
+        <p>Subtotal: {snapshot.symbol}{formatNumber(snapshot.subtotal)} {snapshot.code}</p>
       </section>)}
       {record.note && <section><h2>Note</h2><p>{record.note}</p></section>}
     </article>

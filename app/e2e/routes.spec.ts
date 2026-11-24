@@ -25,14 +25,14 @@ async function configureCountCurrencies(page: Page, firstCurrencyName = "US doll
   await page.getByLabel("Currency name").fill(firstCurrencyName);
   await page.getByLabel("Symbol").fill("$");
   await page.getByLabel("Currency code").fill("USD");
-  await page.getByLabel("Denominations (comma separated)").fill(
-    Array.from({ length: 14 }, (_, index) => index + 1).join(", "),
+  await page.getByLabel("Denominations (semicolon separated)").fill(
+    Array.from({ length: 14 }, (_, index) => index + 1).join("; "),
   );
   await page.getByRole("button", { name: "Add another currency" }).click();
   await page.getByLabel("Currency name").nth(1).fill("Euro");
   await page.getByLabel("Symbol").nth(1).fill("€");
   await page.getByLabel("Currency code").nth(1).fill("EUR");
-  await page.getByLabel("Denominations (comma separated)").nth(1).fill("2, 5");
+  await page.getByLabel("Denominations (semicolon separated)").nth(1).fill("2; 5");
   await page.getByRole("button", { name: "Save configuration" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await page.goto("/count/new");
@@ -117,7 +117,7 @@ test("an unknown direct route renders safely without mutating local records", as
   await page.getByLabel("Currency name").fill("Test Dollar");
   await page.getByLabel("Symbol").fill("$");
   await page.getByLabel("Currency code").fill("TST");
-  await page.getByLabel("Denominations (comma separated)").fill("1, 5");
+  await page.getByLabel("Denominations (semicolon separated)").fill("1; 5");
   await page.getByRole("button", { name: "Save configuration" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   const before = await snapshotLocalData(page);
@@ -240,16 +240,60 @@ test("mobile count rows keep denomination, quantity and subtotal on one line", a
   expect(geometry.overflow).toBe(false);
 });
 
+for (const width of [320, 360, 375, 390]) {
+  test(`grouped denomination and row values remain visible at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto("/onboarding");
+    await page.getByLabel("Currency name").fill("Peso");
+    await page.getByLabel("Symbol").fill("$");
+    await page.getByLabel("Currency code").fill("CUP");
+    await page.getByLabel("Denominations (semicolon separated)").fill("20,000; 1");
+    await page.getByRole("button", { name: "Save configuration" }).click();
+    await page.goto("/count/new");
+    const input = page.getByLabel("$20,000 quantity");
+    await input.fill("99999999");
+    const geometry = await input.locator("..").evaluate((row) => {
+      const label = row.querySelector<HTMLElement>(".denomination-value")!;
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const items = [...row.querySelectorAll<HTMLElement>(".denomination-value, input, .denomination-subtotal")];
+      return { lines: range.getClientRects().length,
+        fits: items.every((item) => item.scrollWidth <= item.clientWidth && item.scrollHeight <= item.clientHeight),
+        overflow: document.documentElement.scrollWidth > innerWidth };
+    });
+    expect(geometry).toEqual({ lines: 1, fits: true, overflow: false });
+  });
+}
+
+test("quantity editing rejects invalid typing and paste while allowing grouped paste", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await configureCountCurrencies(page);
+  const input = page.getByLabel("$1 quantity");
+  await input.fill("1234");
+  await input.press("End");
+  await input.pressSequentially("a-");
+  await expect(input).toHaveValue("1,234");
+  await input.selectText();
+  await page.evaluate(() => navigator.clipboard.writeText("12x34"));
+  await input.press("Control+v");
+  await expect(input).toHaveValue("1,234");
+  await expect(input.locator("..").locator(".denomination-subtotal")).toHaveText("1,234");
+  await page.evaluate(() => navigator.clipboard.writeText("5,678"));
+  await input.press("Control+v");
+  await expect(input).toHaveValue("5,678");
+  await expect(input).toHaveAttribute("inputmode", "numeric");
+});
+
 test("five digit denominations and large totals fit on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/onboarding");
   await page.getByLabel("Currency name").fill("Peso");
   await page.getByLabel("Symbol").fill("$");
   await page.getByLabel("Currency code").fill("CUP");
-  await page.getByLabel("Denominations (comma separated)").fill("20000, 1");
+  await page.getByLabel("Denominations (semicolon separated)").fill("20,000; 1");
   await page.getByRole("button", { name: "Save configuration" }).click();
   await page.goto("/count/new");
-  await page.getByLabel("$20000 quantity").fill("99999999");
+  await page.getByLabel("$20,000 quantity").fill("99999999");
   const geometry = await page.locator(".currency-fieldset").evaluate((fieldset) => {
     const label = fieldset.querySelector<HTMLElement>(".denomination-value")!;
     const total = fieldset.querySelector<HTMLElement>(".currency-total")!;
@@ -270,7 +314,7 @@ test("large quantities remain visible without overflowing their mobile row", asy
   await input.fill("99999999");
   const row = page.locator(".denomination-row").first();
   const subtotal = row.locator(".denomination-subtotal");
-  await expect(subtotal).toHaveText("1399999986");
+  await expect(subtotal).toHaveText("1,399,999,986");
   await expect(subtotal).toHaveClass(/denomination-subtotal--long/);
   const fit = await row.evaluate((element) => {
     const input = element.querySelector("input")!;
@@ -287,18 +331,18 @@ test("ledger rows align numeric values and accommodate extreme subtotals on mobi
   await page.getByLabel("Currency name").fill("Peso");
   await page.getByLabel("Symbol").fill("$");
   await page.getByLabel("Currency code").fill("CUP");
-  await page.getByLabel("Denominations (comma separated)").fill("20000, 1");
+  await page.getByLabel("Denominations (semicolon separated)").fill("20,000; 1");
   await page.getByRole("button", { name: "Save configuration" }).click();
   await page.goto("/count/new");
-  const input = page.getByLabel("$20000 quantity");
+  const input = page.getByLabel("$20,000 quantity");
   await input.fill("99999999");
-  await expect(input).toHaveValue("99999999");
+  await expect(input).toHaveValue("99,999,999");
   await input.fill("999999999");
-  await expect(input).toHaveValue("99999999");
+  await expect(input).toHaveValue("99,999,999");
   await expect(page.getByText("Maximum 8 digits; the previous value was kept.")).toBeVisible();
   const row = input.locator("..");
-  await expect(row.locator(".denomination-value")).toHaveText("20000");
-  await expect(row.locator(".denomination-subtotal")).toHaveText("1999999980000");
+  await expect(row.locator(".denomination-value")).toHaveText("20,000");
+  await expect(row.locator(".denomination-subtotal")).toHaveText("1,999,999,980,000");
   await expect(input).toHaveCSS("text-align", "center");
   await expect(row.locator(".denomination-value")).toHaveCSS("justify-content", "center");
   await expect(row.locator(".denomination-subtotal")).toHaveCSS("justify-content", "center");
@@ -312,7 +356,7 @@ test("each currency total remains sticky within its own fieldset", async ({ page
   await page.setViewportSize({ width: 360, height: 600 });
   await configureCountCurrencies(page);
   await page.getByRole("link", { name: "Settings" }).click();
-  await page.getByLabel("Denominations (comma separated)").nth(1).fill(Array.from({ length: 14 }, (_, i) => i + 1).join(", "));
+  await page.getByLabel("Denominations (semicolon separated)").nth(1).fill(Array.from({ length: 14 }, (_, i) => i + 1).join("; "));
   await page.getByRole("button", { name: "Save settings" }).click();
   await page.getByRole("link", { name: "Count", exact: true }).click();
   for (const [index, symbol] of [[0, "$"], [1, "€"]] as const) {

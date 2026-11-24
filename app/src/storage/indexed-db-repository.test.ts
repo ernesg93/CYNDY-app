@@ -40,6 +40,50 @@ function countSnapshots() {
 }
 
 describe("IndexedDbRepository", () => {
+  it("keeps a separate draft without changing saved counts or settings", async () => {
+    const repository = createRepository();
+    const currencies = currencyConfigurations();
+    await repository.saveCurrencyConfigurations(currencies);
+    const saved = await repository.saveCount({ snapshots: countSnapshots() });
+    const draft = { quantities: { "ars:100": "3", "usd:1": "7" }, note: "draft", selectedCurrencies: ["ars"] };
+    await repository.saveCountDraft(draft, "test-revision");
+    expect(await repository.getCountDraft()).toEqual({ ...draft, revision: "test-revision" });
+    const clearedRevision = await repository.deleteCountDraft();
+    expect(await repository.getCountDraft()).toEqual({ cleared: true, revision: clearedRevision });
+    expect(await repository.getCount(saved.id)).toEqual(saved);
+    expect(await repository.getCurrencyConfigurations()).toEqual(currencies);
+    repository.close();
+  });
+  it.each([
+    { key: "count-draft", version: 99, extra: "preserve me" },
+    { key: "count-draft", version: 1, draft: { quantities: { "usd:1": 2 }, note: "", selectedCurrencies: ["usd"] } },
+  ])("preserves an unsupported or malformed stored draft when reading, writing or deleting it", async (unknown) => {
+    const indexedDB = new IDBFactory();
+    const databaseName = "unsupported-draft";
+    const repository = new IndexedDbRepository({ databaseName, indexedDB });
+    await repository.saveCurrencyConfigurations(currencyConfigurations());
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(databaseName, 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction("settings", "readwrite");
+      tx.objectStore("settings").put(unknown);
+      tx.oncomplete = () => resolve(); tx.onabort = () => reject(tx.error);
+    });
+    await expect(repository.getCountDraft()).rejects.toThrow("Unsupported or invalid count draft");
+    await expect(repository.saveCountDraft({ quantities: {}, note: "", selectedCurrencies: [] }, "new")).rejects.toThrow("Unsupported or invalid count draft");
+    await expect(repository.deleteCountDraft("old")).rejects.toThrow("Unsupported or invalid count draft");
+    const stored = await new Promise<unknown>((resolve, reject) => {
+      const request = db.transaction("settings", "readonly").objectStore("settings").get("count-draft");
+      request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+    });
+    expect(stored).toEqual(unknown);
+    expect(await repository.getCurrencyConfigurations()).toEqual(currencyConfigurations());
+    db.close(); repository.close();
+  });
+
   it("saves a valid count with its generated ID, ISO timestamp, snapshots, and note", async () => {
     const repository = createRepository();
 

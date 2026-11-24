@@ -206,15 +206,16 @@ button.secondary {
   .count-page .currency-fieldset { padding-inline: .4rem; }
   .count-page .denomination-row input { font-size: .8rem; }
 }
-@media (max-width: 24rem) {
+@media (max-width: 42rem) {
   .denomination-row {
-    grid-template-columns:minmax(0, 6.5ch) 10px minmax(44px, 1fr) 10px minmax(0, 1.2fr);
+    grid-template-columns:minmax(max-content, 8ch) 10px minmax(44px, 1fr) 10px minmax(0, 1.2fr);
     gap:2px;
   }
   .denomination-value, .denomination-row input, .denomination-subtotal {
     padding-inline:.25rem;
     overflow-wrap:anywhere;
   }
+  .denomination-value { white-space:nowrap; overflow-wrap:normal; }
 }
 @media (max-width: 20rem) {
   .denomination-row {

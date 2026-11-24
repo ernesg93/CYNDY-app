@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { calculateCountSnapshots, type CountQuantities } from "../domain/count";
+import { formatNumber } from "../domain/format-number";
 import type { CurrencyConfiguration, ValidationIssue } from "../domain/validation";
 import { validateCurrencyConfiguration } from "../domain/validation";
 import {
   BrowserPrintDestination,
   type ReceiptDestination,
 } from "../receipts/receipt-destination";
-import type { CountRecord, IndexedDbRepository } from "../storage/indexed-db-repository";
+import { createDraftRevision, type CountRecord, type IndexedDbRepository } from "../storage/indexed-db-repository";
 
 export interface ConfigurationFormValues {
   name: string;
@@ -92,6 +93,11 @@ const spanish: Readonly<Record<string, string>> = {
   "Note": "Nota",
   "No note": "Sin nota",
   "Print or save": "Imprimir o Guardar",
+  "Resume as new count": "Retomar como nuevo conteo",
+  "Replace unfinished count?": "¿Reemplazar el conteo pendiente?",
+  "The unfinished draft will be replaced. The saved count will remain unchanged.": "El borrador pendiente será reemplazado. El conteo guardado permanecerá sin cambios.",
+  "Replace draft": "Reemplazar borrador",
+  "Could not resume the count. Your draft and saved count were kept. Refresh and try again.": "No se pudo retomar el conteo. Se conservaron el borrador y el conteo guardado. Actualiza e inténtalo de nuevo.",
   "Delete this count": "Eliminar este conteo",
   "Delete this count?": "¿Eliminar este conteo?",
   "Only this saved count will be permanently deleted.": "Solo este conteo guardado se eliminará permanentemente.",
@@ -103,7 +109,8 @@ const spanish: Readonly<Record<string, string>> = {
   "Currency name": "Nombre de la moneda",
   "Symbol": "Símbolo",
   "Currency code": "Código de moneda",
-  "Denominations (comma separated)": "Denominaciones (separadas por comas)",
+  "Denominations (semicolon separated)": "Denominaciones (separadas por punto y coma)",
+  "Example: 1,000; 1": "Ejemplo: 1,000; 1",
   "Add another currency": "Agregar otra moneda",
   "Move up": "Subir",
   "Move down": "Bajar",
@@ -135,7 +142,13 @@ const spanish: Readonly<Record<string, string>> = {
   "Settings saved.": "Ajustes guardados.",
   "Quantities must be non-negative integers.": "Las cantidades deben ser enteros no negativos.",
   "Count saved.": "Conteo guardado.",
-  "Enter a whole number from 0 to 99999999.": "Ingresa un número entero entre 0 y 99999999.",
+  "Draft saved locally.": "Borrador guardado en este dispositivo.",
+  "Draft cleared locally.": "Borrador eliminado de este dispositivo.",
+  "A newer draft was kept on this device.": "Se conservó un borrador más reciente en este dispositivo.",
+  "Could not load the draft. Refresh and try again.": "No se pudo cargar el borrador. Actualiza e inténtalo de nuevo.",
+  "Could not store the draft locally. Your changes may be lost.": "No se pudo guardar el borrador. Podrías perder los cambios.",
+  "Could not discard the draft locally. It may return after reload.": "No se pudo eliminar el borrador. Podría reaparecer al actualizar.",
+  "Enter a whole number from 0 to 99,999,999.": "Ingresa un número entero entre 0 y 99,999,999.",
   "Maximum 8 digits; the previous value was kept.": "Máximo 8 cifras; se conservó el valor anterior.",
   "The count total exceeds the supported range.": "El total del conteo supera el rango permitido.",
   "Could not save the count. Try again.": "No se pudo guardar el conteo. Inténtalo de nuevo.",
@@ -256,10 +269,11 @@ async function submitConfigurations(
     symbol: item.symbol,
     code: item.code,
     denominations: item.denominations
-      .split(",")
+      .split(";")
       .map((value) => value.trim())
       .filter(Boolean)
-      .map(Number),
+      .map((value) => /^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(value)
+        ? Number(value.replace(/,/g, "")) : NaN),
   }));
   const issues = configurations.map((configuration) =>
     validateCurrencyConfiguration(configuration).filter((issue) => issue.field !== "id"));
@@ -297,6 +311,31 @@ export function ConfigurationForm({ values, issues, index, onChange }: Configura
   const t = useText();
   const issueFor = (field: keyof ConfigurationFormValues) =>
     issues.find((issue) => issue.field === field);
+  const updateDenominations = (input: HTMLInputElement, text: string, start: number, end: number, regroupIndex = -1) => {
+    const parts = text.split(";");
+    const formatted = parts.map((part, partIndex) => {
+      const match = part.match(/^(\s*)([\d,]+)(\s*)$/);
+      if (!match) return part;
+      const digits = match[2];
+      if (partIndex !== regroupIndex && !/^\d+$/.test(digits)) return part;
+      return match[1] + formatNumber(digits.replace(/,/g, "")) + match[3];
+    }).join(";");
+    const mapPosition = (position: number) => {
+      const prefix = text.slice(0, position).replace(/,/g, "");
+      let offset = 0;
+      let consumed = 0;
+      while (offset < formatted.length && consumed < prefix.length) {
+        if (formatted[offset] !== ",") consumed++;
+        offset++;
+      }
+      return offset;
+    };
+    const newStart = mapPosition(start);
+    const newEnd = mapPosition(end);
+    input.value = formatted;
+    input.setSelectionRange(newStart, newEnd);
+    onChange({ ...values, denominations: formatted });
+  };
   const field = (name: keyof ConfigurationFormValues, label: string) => {
     const issue = issueFor(name);
     const inputId = `currency-${index}-${name}`;
@@ -310,7 +349,39 @@ export function ConfigurationForm({ values, issues, index, onChange }: Configura
           value={values[name]}
           aria-invalid={issue ? true : undefined}
           aria-describedby={issue ? errorId : undefined}
-          onChange={(event) => onChange({ ...values, [name]: event.target.value })}
+          onKeyDown={(event) => {
+            if (name !== "denominations" || event.altKey || event.ctrlKey || event.metaKey) return;
+            const input = event.currentTarget;
+            const caret = input.selectionStart;
+            if (caret === null || caret !== input.selectionEnd) return;
+            const backward = event.key === "Backspace" && input.value[caret - 1] === ",";
+            const forward = event.key === "Delete" && input.value[caret] === ",";
+            if (!backward && !forward) return;
+            const index = backward ? caret - 2 : caret + 1;
+            if (!/\d/.test(input.value[index] ?? "")) return;
+            event.preventDefault();
+            const text = input.value.slice(0, index) + input.value.slice(index + 1);
+            const next = backward ? index : caret;
+            updateDenominations(input, text, next, next, text.slice(0, next).split(";").length - 1);
+          }}
+          onChange={(event) => {
+            if (name !== "denominations") {
+              onChange({ ...values, [name]: event.target.value });
+              return;
+            }
+            const input = event.currentTarget;
+            const text = input.value;
+            const start = input.selectionStart ?? text.length;
+            const end = input.selectionEnd ?? start;
+            const native = event.nativeEvent as InputEvent;
+            const partIndex = text.slice(0, start).split(";").length - 1;
+            const previous = values.denominations.split(";")[partIndex]?.trim() ?? "";
+            const edited = text.split(";")[partIndex]?.trim() ?? "";
+            const regroup = (native.inputType === "insertText" || native.inputType?.startsWith("deleteContent"))
+              && native.data !== "," && /^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(previous)
+              && /^[\d,]+$/.test(edited) ? partIndex : -1;
+            updateDenominations(input, text, start, end, regroup);
+          }}
         />
         {issue && <span id={errorId} className="error field-error" role="alert">{formatIssue(t(issue.message))}</span>}
       </div>
@@ -322,12 +393,23 @@ export function ConfigurationForm({ values, issues, index, onChange }: Configura
       {field("name", t("Currency name"))}
       {field("symbol", t("Symbol"))}
       {field("code", t("Currency code"))}
-      {field("denominations", t("Denominations (comma separated)"))}
+      {field("denominations", t("Denominations (semicolon separated)"))}
+      <p>{t("Example: 1,000; 1")}</p>
     </fieldset>
   );
 }
 
 const browserPrintDestination = new BrowserPrintDestination();
+const draftQueues = new WeakMap<IndexedDbRepository, { current: Promise<void> }>();
+
+function draftQueue(repository: IndexedDbRepository) {
+  let queue = draftQueues.get(repository);
+  if (!queue) {
+    queue = { current: Promise.resolve() };
+    draftQueues.set(repository, queue);
+  }
+  return queue;
+}
 
 export function ApplicationRoutes({ repository, receiptDestination = browserPrintDestination }: {
   repository: IndexedDbRepository;
@@ -340,22 +422,115 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
   const [saveError, setSaveError] = useState<string>();
   const [notice, setNotice] = useState<string>();
   const [path, setPath] = useState(() => `${window.location.pathname}${window.location.search}`);
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  const resumeLock = useRef(false);
+  const [resumePending, setResumePending] = useState(false);
   const [selectedCurrencies, setSelectedCurrencies] = useState<readonly string[]>([]);
   const [countDraft, setCountDraft] = useState<CountDraftState>({
     quantities: {}, note: "", invalidQuantityKeys: new Set(),
   });
+  const draftRef = useRef(countDraft);
+  const historicalRef = useRef<readonly CurrencyConfiguration[] | undefined>(undefined);
+  const [historicalConfigurations, setHistoricalConfigurations] = useState<readonly CurrencyConfiguration[]>();
+  const hasDraft = useRef(false);
+  const selectedRef = useRef(selectedCurrencies);
+  const revision = useRef(0);
+  const resetEpoch = useRef(0);
+  const durableRevision = useRef<string | null>(null);
+  const committedRevision = useRef<string | null>(null);
+  const pending = draftQueue(repository);
+  const [draftFeedback, setDraftFeedback] = useState<{ error: boolean; text: string }>();
+  const enqueue = (operation: () => Promise<void>) => {
+    const result = pending.current.then(operation);
+    pending.current = result.catch(() => {});
+    return result;
+  };
+  const persist = (draft: CountDraftState, selected: readonly string[]) => {
+    hasDraft.current = true;
+    const current = ++revision.current;
+    const identity = createDraftRevision();
+    const epoch = resetEpoch.current;
+    const historical = historicalRef.current;
+    durableRevision.current = identity;
+    setDraftFeedback(undefined);
+    void enqueue(async () => {
+      if (epoch !== resetEpoch.current) return;
+      await repository.saveCountDraft({ quantities: draft.quantities, note: draft.note, selectedCurrencies: selected, ...(historical ? { historicalConfigurations: historical } : {}) }, identity, committedRevision.current);
+      committedRevision.current = identity;
+    }).then(() => {
+      if (current === revision.current) setDraftFeedback({ error: false, text: "Draft saved locally." });
+    }).catch(() => {
+      if (current === revision.current) setDraftFeedback({ error: true, text: "Could not store the draft locally. Your changes may be lost." });
+    });
+  };
+  const updateDraft = (update: CountDraftState | ((current: CountDraftState) => CountDraftState)) => {
+    const previous = draftRef.current;
+    const next = typeof update === "function" ? update(previous) : update;
+    draftRef.current = next;
+    setCountDraft(next);
+    if (next.quantities !== previous.quantities || next.note !== previous.note) persist(next, selectedRef.current);
+  };
+  const updateSelection = (selected: readonly string[]) => {
+    selectedRef.current = selected;
+    setSelectedCurrencies(selected);
+    persist(draftRef.current, selected);
+  };
+  const discard = async (expected: string | null) => {
+    if (expected !== durableRevision.current) return;
+    const current = ++revision.current;
+    const nextRevision = createDraftRevision();
+    durableRevision.current = nextRevision;
+    setDraftFeedback(undefined);
+    try {
+      let removed: string | null = null;
+      await enqueue(async () => {
+        removed = await repository.deleteCountDraft(committedRevision.current, nextRevision);
+        if (removed) committedRevision.current = removed;
+      });
+      if (current === revision.current && removed) {
+        durableRevision.current = removed;
+        hasDraft.current = false;
+        setDraftFeedback({ error: false, text: "Draft cleared locally." });
+      } else if (current === revision.current) {
+        setDraftFeedback({ error: true, text: "A newer draft was kept on this device." });
+      }
+    } catch {
+      if (current === revision.current) setDraftFeedback({ error: true, text: "Could not discard the draft locally. It may return after reload." });
+    }
+  };
   useEffect(() => {
+    let active = true;
     void repository.getCurrencyConfigurations()
       .then(async (saved) => {
         const initial = saved.length || window.location.pathname === "/onboarding" ? saved : defaultCurrencies;
         if (!saved.length && initial.length) await repository.saveCurrencyConfigurations(initial);
+        let restored;
+        try { await pending.current; restored = await repository.getCountDraft(); }
+        catch { if (active) setLoadError("Could not load the draft. Refresh and try again."); return; }
+        if (!active) return;
+        const liveDraft = restored && !("cleared" in restored) ? restored : undefined;
+        const selected = liveDraft?.selectedCurrencies ?? initial.map((currency) => currency.id);
+        const draft: CountDraftState = { quantities: liveDraft?.quantities ?? {}, note: liveDraft?.note ?? "", invalidQuantityKeys: new Set() };
+        draftRef.current = draft;
+        historicalRef.current = liveDraft?.historicalConfigurations;
+        setHistoricalConfigurations(liveDraft?.historicalConfigurations);
+        hasDraft.current = !!liveDraft;
+        durableRevision.current = restored?.revision ?? null;
+        committedRevision.current = durableRevision.current;
+        selectedRef.current = selected;
+        setCountDraft(draft);
+        setSelectedCurrencies(selected);
         setConfigurations(initial);
-        setSelectedCurrencies(initial.map((currency) => currency.id));
       })
-      .catch(() => setLoadError("Could not load local settings. Refresh and try again."));
+      .catch(() => { if (active) setLoadError("Could not load local settings. Refresh and try again."); });
+    return () => { active = false; };
   }, [repository]);
   useEffect(() => {
-    const syncPath = () => setPath(`${window.location.pathname}${window.location.search}`);
+    const syncPath = () => {
+      if (resumeLock.current) { window.history.replaceState({}, "", pathRef.current); return; }
+      setPath(`${window.location.pathname}${window.location.search}`);
+    };
     window.addEventListener("popstate", syncPath);
     return () => window.removeEventListener("popstate", syncPath);
   }, []);
@@ -378,7 +553,9 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
       if (result.saved && result.configurations) {
         replaceLocation("/");
         setConfigurations(result.configurations);
-        setSelectedCurrencies(result.configurations.map((currency) => currency.id));
+        const selected = result.configurations.map((currency) => currency.id);
+        selectedRef.current = selected;
+        setSelectedCurrencies(selected);
       }
     } catch {
       setIssues([]);
@@ -393,26 +570,99 @@ export function ApplicationRoutes({ repository, receiptDestination = browserPrin
       onAdd={() => setValues([...values, emptyConfiguration])}
       onSubmit={() => void save()} /></AppShell>;
   }
-  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} configurations={configurations} selected={selectedCurrencies} onSelectionChange={setSelectedCurrencies} onReset={() => {
+  const prepareResume = async () => {
+    const localRevision = revision.current;
+    await pending.current;
+    const stored = await repository.getCountDraft();
+    if (localRevision !== revision.current) throw new Error("Draft changed");
+    return { expected: stored?.revision ?? null, localRevision, needsConfirmation: hasDraft.current || !!(stored && !("cleared" in stored)) };
+  };
+  const resume = async (record: CountRecord, prepared: Awaited<ReturnType<typeof prepareResume>>) => {
+    const historical = record.snapshots.map((snapshot) => ({ id: snapshot.currencyId, name: snapshot.name, symbol: snapshot.symbol, code: snapshot.code, denominations: snapshot.entries.map((entry) => entry.denomination) }));
+    if (!historical.length || historical.some((item) => validateCurrencyConfiguration(item).length) || findDuplicateCurrencyIndexes(historical).size) throw new Error("Unsupported historical configuration");
+    const quantities = Object.fromEntries(record.snapshots.flatMap((snapshot) => snapshot.entries.map((entry) => [`${snapshot.currencyId}:${entry.denomination}`, String(entry.quantity)])));
+    const selected = historical.map((item) => item.id);
+    const draft: CountDraftState = { quantities, note: record.title ?? "", invalidQuantityKeys: new Set() };
+    const identity = createDraftRevision();
+    if (resumeLock.current) throw new Error("Resume in progress");
+    resumeLock.current = true;
+    setResumePending(true);
+    try {
+      await enqueue(async () => {
+        if (revision.current !== prepared.localRevision) throw new Error("Draft changed");
+        await repository.saveCountDraft({ quantities, note: draft.note, selectedCurrencies: selected, historicalConfigurations: historical }, identity, prepared.expected);
+        committedRevision.current = identity;
+      });
+      if (revision.current !== prepared.localRevision) throw new Error("Draft changed while resuming");
+      ++revision.current;
+      durableRevision.current = identity;
+      hasDraft.current = true;
+      historicalRef.current = historical;
+      setHistoricalConfigurations(historical);
+      draftRef.current = draft;
+      setCountDraft(draft);
+      selectedRef.current = selected;
+      setSelectedCurrencies(selected);
+      setDraftFeedback(undefined);
+      resumeLock.current = false;
+      replaceLocation("/count/new");
+      setPath("/count/new");
+    } finally {
+      resumeLock.current = false;
+      setResumePending(false);
+    }
+  };
+  if (route.page === "dashboard") return <AppShell><Dashboard repository={repository} configurations={configurations} selected={selectedCurrencies} onSelectionChange={updateSelection} feedback={draftFeedback} reset={() => enqueue(async () => {
+    await repository.resetAll(defaultCurrencies);
+    ++resetEpoch.current;
+    ++revision.current;
+    durableRevision.current = (await repository.getCountDraft())?.revision ?? null;
+    committedRevision.current = durableRevision.current;
+  })} onReset={() => {
+    ++revision.current;
     replaceLocation("/");
-    setSelectedCurrencies(defaultCurrencies.map((currency) => currency.id));
+    const selected = defaultCurrencies.map((currency) => currency.id);
+    selectedRef.current = selected;
+    setSelectedCurrencies(selected);
+    const empty = { quantities: {}, note: "", invalidQuantityKeys: new Set<string>() };
+    draftRef.current = empty;
+    setCountDraft(empty);
+    setDraftFeedback(undefined);
+    hasDraft.current = false;
+    historicalRef.current = undefined;
+    setHistoricalConfigurations(undefined);
     setNotice("All local data was reset.");
     setValues([emptyConfiguration]);
     setIssues([[]]);
     setSaveError(undefined);
     setConfigurations(defaultCurrencies);
   }} /></AppShell>;
-  if (route.page === "count") return <AppShell><CountPage configurations={configurations}
-    repository={repository} state={countDraft} onChange={setCountDraft} selected={selectedCurrencies} onSelectionChange={setSelectedCurrencies} /></AppShell>;
+  if (route.page === "count") return <AppShell><CountPage configurations={historicalConfigurations ?? configurations}
+    repository={repository} state={countDraft} onChange={updateDraft} selected={selectedCurrencies} onSelectionChange={updateSelection}
+    feedback={draftFeedback} getRevision={() => revision.current} getDraftRevision={() => durableRevision.current} onDiscard={discard} onClear={() => {
+      const empty = { quantities: {}, note: "", invalidQuantityKeys: new Set<string>() };
+      draftRef.current = empty;
+      setCountDraft(empty);
+      historicalRef.current = undefined;
+      setHistoricalConfigurations(undefined);
+      void discard(durableRevision.current);
+    }} /></AppShell>;
   if (route.page === "settings") return <AppShell><SettingsPage configurations={configurations}
-    repository={repository} onSaved={(updated) => { setConfigurations(updated); setSelectedCurrencies((current) => [...current.filter((id) => updated.some((currency) => currency.id === id)), ...updated.filter((currency) => !configurations.some((previous) => previous.id === currency.id)).map((currency) => currency.id)]); }} /></AppShell>;
+    repository={repository} onSaved={(updated) => {
+      setConfigurations(updated);
+      if (!historicalRef.current) {
+        const selected = [...selectedRef.current.filter((id) => updated.some((currency) => currency.id === id)), ...updated.filter((currency) => !configurations.some((previous) => previous.id === currency.id)).map((currency) => currency.id)];
+        updateSelection(selected);
+      }
+    }} /></AppShell>;
   if (route.page === "history") return <AppShell><HistoryPage repository={repository} /></AppShell>;
-  if (route.page === "detail") return <AppShell><CountDetailPage countId={route.countId!} repository={repository} destination={receiptDestination} /></AppShell>;
+  if (route.page === "detail") return <><div inert={resumePending || undefined}><AppShell><CountDetailPage countId={route.countId!} repository={repository} destination={receiptDestination} prepareResume={prepareResume} resume={resume} /></AppShell></div>{resumePending && <LocalizedText role="status" text="Saving…" />}</>;
   return <AppShell><Page title="Page not found"><ReturnHomeLink /></Page></AppShell>;
 }
 
-function Dashboard({ repository, onReset, configurations, selected, onSelectionChange }: {
-  repository: IndexedDbRepository; onReset: () => void;
+function Dashboard({ repository, onReset, reset, configurations, selected, onSelectionChange, feedback }: {
+  repository: IndexedDbRepository; onReset: () => void; reset: () => Promise<void>;
+  feedback?: { error: boolean; text: string };
   configurations: readonly CurrencyConfiguration[]; selected: readonly string[]; onSelectionChange: (ids: readonly string[]) => void;
 }) {
   const t = useText();
@@ -441,6 +691,7 @@ function Dashboard({ repository, onReset, configurations, selected, onSelectionC
   return <Page title="Dashboard">
     <p className="eyebrow">{t("Local dashboard")}</p>
     <p className="dashboard-intro">{t("Review saved counts on this device.")}</p>
+    {feedback && <p className={feedback.error ? "error" : "status"} role={feedback.error ? "alert" : undefined}>{t(feedback.text)}</p>}
     <CurrencySelector configurations={configurations} selected={selected} onChange={onSelectionChange} />
     <a className="button dashboard-start" href="/count/new" onClick={(event) => { if (selected.length === 0) event.preventDefault(); else navigateLocally("/count/new")(event); }} aria-disabled={selected.length === 0} >{t("Start a count")}</a>
     <a href="/settings" onClick={navigateLocally("/settings")}>{t("Configure another currency")}</a>
@@ -452,9 +703,9 @@ function Dashboard({ repository, onReset, configurations, selected, onSelectionC
       <a href={`/history/${encodeURIComponent(data.latest.id)}`}>{t("View latest count")}</a>
     </article> : <p>{t("No saved counts yet.")}</p>}</section>
     <section className="dashboard-section" aria-labelledby="local-statistics-title"><h2 id="local-statistics-title">{t("Local statistics")}</h2>
-    <article className="dashboard-card"><p>{data.counts.length} {t("saved")} {t(data.counts.length === 1 ? "count" : "counts")}</p>
+    <article className="dashboard-card"><p>{formatNumber(data.counts.length)} {t("saved")} {t(data.counts.length === 1 ? "count" : "counts")}</p>
     <ul>{[...statistics].map(([code, count]) =>
-      <li key={code}>{code}: {count} {t(count === 1 ? "count" : "counts")}</li>)}</ul></article></section>
+      <li key={code}>{code}: {formatNumber(count)} {t(count === 1 ? "count" : "counts")}</li>)}</ul></article></section>
     <section className="dashboard-section dashboard-data" aria-labelledby="local-data-title"><h2 id="local-data-title">{t("Local data")}</h2>
     {resetNotice && <p className="status" role="status">{t("All local data was reset.")}</p>}
     {resetError && <p ref={resetErrorRef} className="error" role="alert" tabIndex={-1}>
@@ -473,7 +724,7 @@ function Dashboard({ repository, onReset, configurations, selected, onSelectionC
       onCancel={() => {
         setResetStage(0); setTimeout(() => resetButtonRef.current?.focus());
       }}
-      onConfirm={() => resetStage === 1 ? setResetStage(2) : void repository.resetAll(defaultCurrencies)
+      onConfirm={() => resetStage === 1 ? setResetStage(2) : void reset()
         .then(() => { setData({ counts: [] }); setResetStage(0); setResetNotice(true); onReset(); })
         .catch(() => {
           setResetStage(0);
@@ -514,13 +765,25 @@ function HistoryPage({ repository }: { repository: IndexedDbRepository }) {
   </Page>;
 }
 
-function CountDetailPage({ countId, repository, destination }: {
+function CountDetailPage({ countId, repository, destination, prepareResume, resume }: {
   countId: string; repository: IndexedDbRepository; destination: ReceiptDestination;
+  prepareResume: () => Promise<{ expected: string | null; localRevision: number; needsConfirmation: boolean }>;
+  resume: (record: CountRecord, prepared: { expected: string | null; localRevision: number; needsConfirmation: boolean }) => Promise<void>;
 }) {
   const t = useText();
   const [record, setRecord] = useState<CountRecord | null>();
   const [error, setError] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [prepared, setPrepared] = useState<Awaited<ReturnType<typeof prepareResume>>>();
+  const [resumeError, setResumeError] = useState(false);
+  const [, setResuming] = useState(false);
+  const resumeBusy = useRef(false);
+  const detailGeneration = useRef(0);
+  useEffect(() => {
+    ++detailGeneration.current;
+    resumeBusy.current = false;
+    return () => { ++detailGeneration.current; };
+  }, [countId]);
   const [deleteError, setDeleteError] = useState<string>();
   const [deleted, setDeleted] = useState(false);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
@@ -542,11 +805,31 @@ function CountDetailPage({ countId, repository, destination }: {
       <h2>{snapshot.name} ({snapshot.code})</h2>
       <table className="detail-table" aria-label={`${snapshot.name} (${snapshot.code})`}>
         <thead><tr><th scope="col">{t("Denomination")}</th><th scope="col">{t("Quantity")}</th><th scope="col">{t("Subtotal")}</th></tr></thead>
-        <tbody>{snapshot.entries.map((entry) => <tr key={entry.denomination}><td>{snapshot.symbol}{entry.denomination}</td><td>{entry.quantity}</td><td>{snapshot.symbol}{entry.total}</td></tr>)}</tbody>
+        <tbody>{snapshot.entries.map((entry) => <tr key={entry.denomination}><td>{snapshot.symbol}{formatNumber(entry.denomination)}</td><td>{formatNumber(entry.quantity)}</td><td>{snapshot.symbol}{formatNumber(entry.total)}</td></tr>)}</tbody>
       </table>
-      <p>{t("Total")}: {snapshot.symbol}{snapshot.subtotal} {snapshot.code}</p>
+      <p>{t("Total")}: {snapshot.symbol}{formatNumber(snapshot.subtotal)} {snapshot.code}</p>
     </section>)}</div>
     <div className="detail-actions"><button type="button" onClick={() => destination.deliver(record)}>{t("Print or save")}</button>
+    <button type="button" onClick={() => {
+      if (resumeBusy.current) return;
+      resumeBusy.current = true; setResuming(true); setResumeError(false);
+      const origin = `${window.location.pathname}${window.location.search}`;
+      const generation = detailGeneration.current;
+      const isCurrent = () => detailGeneration.current === generation && `${window.location.pathname}${window.location.search}` === origin;
+      void prepareResume().then(async (result) => {
+        if (!isCurrent()) return;
+        if (result.needsConfirmation) setPrepared(result);
+        else await resume(record, result);
+      }).catch(() => { if (isCurrent()) setResumeError(true); }).finally(() => {
+        if (isCurrent()) { resumeBusy.current = false; setResuming(false); }
+      });
+    }}>{t("Resume as new count")}</button>
+    {resumeError && <p role="alert" className="error">{t("Could not resume the count. Your draft and saved count were kept. Refresh and try again.")}</p>}
+    {prepared && <ConfirmationPanel title="Replace unfinished count?" description="The unfinished draft will be replaced. The saved count will remain unchanged." cancelLabel="Cancel" confirmLabel="Replace draft" onCancel={() => setPrepared(undefined)} onConfirm={() => {
+      if (resumeBusy.current) return;
+      resumeBusy.current = true; setResuming(true);
+      void resume(record, prepared).catch(() => setResumeError(true)).finally(() => { resumeBusy.current = false; setResuming(false); setPrepared(undefined); });
+    }} />}
     {deleteError && <p ref={feedbackRef} className="error" role="alert" tabIndex={-1}>
       {t(deleteError)}
     </p>}
@@ -611,7 +894,7 @@ function CountTime({ record, className }: { record: CountRecord; className?: str
 
 function SnapshotSubtotals({ record, className }: { record: CountRecord; className?: string }) {
   return <ul className={className}>{record.snapshots.map((snapshot) => <li key={snapshot.currencyId}>
-    {snapshot.symbol}{snapshot.subtotal} {snapshot.code}
+    {snapshot.symbol}{formatNumber(snapshot.subtotal)} {snapshot.code}
   </li>)}</ul>;
 }
 
@@ -661,7 +944,7 @@ function SettingsPage({ configurations, repository, onSaved }: {
       name: configuration.name,
       symbol: configuration.symbol,
       code: configuration.code,
-      denominations: configuration.denominations.join(", "),
+      denominations: configuration.denominations.map(formatNumber).join("; "),
     })) : [emptyConfiguration]);
   const [issues, setIssues] = useState<readonly (readonly ValidationIssue[])[]>([[]]);
   const [keys, setKeys] = useState(() => configurations.length ? configurations.map((_, index) => index) : [0]);
@@ -752,8 +1035,9 @@ function CurrencySelector({ configurations, selected, onChange }: {
   </fieldset>;
 }
 
-function CountPage({ configurations: allConfigurations, repository, state, onChange, selected, onSelectionChange }: {
+function CountPage({ configurations: allConfigurations, repository, state, onChange, selected, onSelectionChange, feedback, getRevision, getDraftRevision, onDiscard, onClear }: {
   configurations: readonly CurrencyConfiguration[]; selected: readonly string[]; onSelectionChange: (ids: readonly string[]) => void;
+  feedback?: { error: boolean; text: string }; getRevision: () => number; getDraftRevision: () => string | null; onDiscard: (revision: string | null) => Promise<void>; onClear: () => void;
   repository: Pick<IndexedDbRepository, "saveCount">;
   state: CountDraftState;
   onChange: (update: CountDraftState | ((state: CountDraftState) => CountDraftState)) => void;
@@ -766,6 +1050,7 @@ function CountPage({ configurations: allConfigurations, repository, state, onCha
   const [confirmation, setConfirmation] = useState<string>();
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const [limitWarning, setLimitWarning] = useState<string>();
+  const selectionRef = useRef<{ input: HTMLInputElement; start: number; end: number; value: string } | null>(null);
   const quantities = toQuantities(configurations, draft, false);
   let rangeExceeded = false;
   let snapshots;
@@ -780,7 +1065,7 @@ function CountPage({ configurations: allConfigurations, repository, state, onCha
   const clear = () => {
     setConfirmation(undefined);
     setLimitWarning(undefined);
-    onChange({ quantities: {}, note: "", invalidQuantityKeys: new Set() });
+    onClear();
   };
 
   const save = async (confirmDuplicate = false) => {
@@ -813,7 +1098,10 @@ function CountPage({ configurations: allConfigurations, repository, state, onCha
       setConfirmation(undefined);
       savingRef.current = true;
       setSaving(true);
+      const savingRevision = getRevision();
+      const savedDraftRevision = getDraftRevision();
       await repository.saveCount(payload);
+      if (savingRevision === getRevision()) await onDiscard(savedDraftRevision);
       onChange((current) => ({ ...current, invalidQuantityKeys: invalidKeys,
         lastSavedCount: fingerprint, message: "Count saved." }));
     } catch {
@@ -833,7 +1121,7 @@ function CountPage({ configurations: allConfigurations, repository, state, onCha
       <fieldset className="currency-fieldset" key={configuration.id}>
       <legend>{configuration.name} ({configuration.code})</legend>
       <p className="currency-total"><strong>
-        {rangeExceeded ? "—" : `${configuration.symbol} ${snapshots[currencyIndex].subtotal.toLocaleString("en-US")} ${configuration.code}`}
+        {rangeExceeded ? "—" : `${configuration.symbol} ${formatNumber(snapshots[currencyIndex].subtotal)} ${configuration.code}`}
       </strong></p>
       {[...snapshots[currencyIndex].entries].sort((a, b) => b.denomination - a.denomination).map((entry) => {
         const key = `${configuration.id}:${entry.denomination}`;
@@ -841,44 +1129,115 @@ function CountPage({ configurations: allConfigurations, repository, state, onCha
         const subtotalDescriptionId = `${subtotalId}-description`;
         const errorId = `${key}-error`;
         const invalid = invalidQuantityKeys.has(key);
+        const updateQuantity = (input: HTMLInputElement, value: string, beforeCaret: number) => {
+          if (/^\d{9,}$/.test(value)) {
+            input.value = formatNumber(draft[key] ?? "");
+            setLimitWarning(key);
+            return;
+          }
+          const formatted = formatNumber(value);
+          let position = 0;
+          let characters = 0;
+          while (position < formatted.length && characters < beforeCaret) {
+            if (formatted[position] !== ",") characters++;
+            position++;
+          }
+          input.value = formatted;
+          input.setSelectionRange(position, position);
+          selectionRef.current = null;
+          setLimitWarning(undefined);
+          setConfirmation(undefined);
+          onChange({ ...state, quantities: { ...draft, [key]: value },
+            invalidQuantityKeys: invalid && !isInvalidQuantity(value)
+              ? new Set([...invalidQuantityKeys].filter((item) => item !== key))
+              : invalidQuantityKeys });
+        };
         return <div className="denomination-row" key={key}>
-          <label className="denomination-value" htmlFor={key}>{entry.denomination}</label>
+          <label className="denomination-value" htmlFor={key}>{formatNumber(entry.denomination)}</label>
           <span className="row-operator" aria-hidden="true">×</span>
-          <input id={key} type="number" min="0" max="99999999" step="1" inputMode="numeric"
-            aria-label={`${configuration.symbol}${entry.denomination} ${t("quantity")}`}
+          <input id={key} type="text" inputMode="numeric"
+            aria-label={`${configuration.symbol}${formatNumber(entry.denomination)} ${t("quantity")}`}
             aria-invalid={invalid ? true : undefined}
             aria-describedby={`${subtotalDescriptionId}${invalid ? ` ${errorId}` : ""}`}
-            value={draft[key] ?? "0"}
-            onFocus={(event) => event.currentTarget.select()}
-            onBlur={(event) => { if (event.currentTarget.value === "") onChange((current) => ({ ...current, quantities: { ...current.quantities, [key]: "0" } })); }}
+            value={formatNumber(draft[key] ?? "0")}
+            onBlur={(event) => { selectionRef.current = null; if (event.currentTarget.value === "") onChange((current) => ({ ...current, quantities: { ...current.quantities, [key]: "0" } })); }}
+            onSelect={(event) => {
+              const input = event.currentTarget;
+              selectionRef.current = { input, start: input.selectionStart ?? 0, end: input.selectionEnd ?? 0, value: input.value };
+            }}
+            onPaste={(event) => {
+              const text = event.clipboardData.getData("text");
+              if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(text)) event.preventDefault();
+            }}
+            onKeyDown={(event) => {
+              const input = event.currentTarget;
+              const caret = input.selectionStart;
+              if (caret === null || caret !== input.selectionEnd || event.altKey || event.ctrlKey || event.metaKey) return;
+              const backward = event.key === "Backspace" && input.value[caret - 1] === ",";
+              const forward = event.key === "Delete" && input.value[caret] === ",";
+              if (!backward && !forward) return;
+              event.preventDefault();
+              const raw = input.value.replace(/,/g, "");
+              const before = input.value.slice(0, caret).replace(/,/g, "").length;
+              const index = backward ? before - 1 : before;
+              updateQuantity(input, raw.slice(0, index) + raw.slice(index + 1), backward ? index : before);
+            }}
             onChange={(event) => {
-              const value = event.target.value;
-              if (/^\d{9,}$/.test(value)) {
-                event.target.value = draft[key] ?? "";
-                setLimitWarning(key);
+              const input = event.currentTarget;
+              const displayed = input.value;
+              if (/[^\d,]/.test(displayed)) {
+                input.value = formatNumber(draft[key] ?? "0");
+                const selection = selectionRef.current;
+                if (selection?.input === input && selection.value === input.value) {
+                  input.setSelectionRange(selection.start, selection.end);
+                }
                 return;
               }
-              setLimitWarning(undefined);
-              setConfirmation(undefined);
-              onChange({ ...state, quantities: { ...draft, [key]: value },
-                invalidQuantityKeys: invalid && !isInvalidQuantity(value)
-                  ? new Set([...invalidQuantityKeys].filter((item) => item !== key))
-                  : invalidQuantityKeys });
+              const caret = input.selectionStart ?? displayed.length;
+              let value = displayed.replace(/,/g, "");
+              let before = displayed.slice(0, caret).replace(/,/g, "").length;
+              const inputType = (event.nativeEvent as InputEvent).inputType;
+              const previous = draft[key] ?? "0";
+              const selection = selectionRef.current;
+              const deletedSelection = selection?.input === input && selection.value === formatNumber(previous)
+                && selection.start !== selection.end;
+              if (previous === "0" && !deletedSelection && !inputType?.startsWith("delete") && value.length > 1) {
+                if (before === value.length && value.startsWith("0")) {
+                  value = value.slice(1);
+                  before--;
+                } else if (before === value.length - 1 && value.endsWith("0")) {
+                  value = value.slice(0, -1);
+                }
+                if (/^0+$/.test(value)) {
+                  value = "0";
+                  before = 1;
+                }
+              }
+              if (!deletedSelection && value === previous && displayed !== formatNumber(previous)
+                && (inputType === "deleteContentBackward" || inputType === "deleteContentForward")) {
+                const index = inputType === "deleteContentBackward" ? before - 1 : before;
+                if (index >= 0 && index < value.length) {
+                  value = value.slice(0, index) + value.slice(index + 1);
+                  if (inputType === "deleteContentBackward") before--;
+                }
+              }
+              updateQuantity(input, value, before);
             }} />
           <span className="row-operator" aria-hidden="true">=</span>
-          <span id={subtotalId} className={`denomination-subtotal${String(entry.total).length > 8 ? " denomination-subtotal--long" : ""}`}>{rangeExceeded ? "—" : entry.total}</span>
+          <span id={subtotalId} className={`denomination-subtotal${String(entry.total).length > 8 ? " denomination-subtotal--long" : ""}`}>{rangeExceeded ? "—" : formatNumber(entry.total)}</span>
           <span id={subtotalDescriptionId} className="visually-hidden">
-            {t("Subtotal")}: {configuration.symbol}{entry.total} {configuration.code}
+            {t("Subtotal")}: {configuration.symbol}{formatNumber(entry.total)} {configuration.code}
           </span>
           {limitWarning === key && <span className="error" role="status">{t("Maximum 8 digits; the previous value was kept.")}</span>}
           {invalid && <span id={errorId} className="error">
             {t(Number(draft[key]) > 99999999
-              ? "Enter a whole number from 0 to 99999999."
+              ? "Enter a whole number from 0 to 99,999,999."
               : "Enter a non-negative whole number within the safe integer range.")}
           </span>}
         </div>;
       })}
     </fieldset>)}
+    {feedback && <p className={feedback.error ? "error" : "status"} role={feedback.error ? "alert" : undefined}>{t(feedback.text)}</p>}
     {rangeExceeded && <p className="error" role="alert">{t("The count total exceeds the supported range.")}</p>}
     {message && <p className={message === "Count saved." ? "status" : "error"}
       role={message === "Count saved." ? "status" : "alert"}>{t(message)}</p>}

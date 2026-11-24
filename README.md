@@ -8,9 +8,11 @@ CYNDY is an Android-first, offline-capable MVP with device-local currency settin
 
 ## Start a count
 
-On a fresh installation, USD and CUP are ready to use. Select one or more currencies on the dashboard, then start a count; you can also change the selection while counting. A temporarily deselected currency keeps its draft quantities but is not included when the count is saved. Use Settings to add other currencies and denominations.
+On a fresh installation, USD and CUP are ready to use. Select one or more currencies on the dashboard, then start a count; you can also change the selection while counting. A temporarily deselected currency keeps its draft quantities but is not included when the count is saved. Use Settings to add other currencies and denominations. Enter positive whole-number denominations separated by semicolons, for example `1,000; 1`; commas group thousands. Existing saved denominations are unchanged.
 
-A count can have an optional title. Saved counts appear in History, where you can inspect or delete them and print or save a receipt. Older records may contain notes: those notes remain in local storage but are not displayed in the current count-details screen. Resetting local data removes saved counts and restores the default currencies.
+One in-progress count, including its title, quantities and currency selection, is stored locally and restored automatically after a reload once the app reports that the draft was saved locally. Saving the count or clearing the unsaved count discards that draft; storage failures are reported on screen. Changes still being written may be lost if the app is closed, and browser close/relaunch behavior has not been verified.
+
+A count can have an optional title. Saved counts appear in History, where you can inspect or delete them and print or save a receipt. From a saved count, **Resume as new count** creates an editable draft with the saved currencies, denominations and quantities, even if settings have since changed. The original stays unchanged; saving creates a separate record. If an unfinished draft exists, confirm its replacement or cancel to keep it. Older records may contain notes: those notes remain in local storage but are not displayed in the current count-details screen. Resetting local data removes saved counts and restores the default currencies.
 
 ## Product boundaries
 

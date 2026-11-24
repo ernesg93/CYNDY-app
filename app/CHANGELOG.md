@@ -5,7 +5,6 @@
 
 ### Features
 
-* **count:** persist drafts and resume saved counts ([5562ecb](https://github.com/ernesg93/CYNDY-app/commit/5562ecbf786c49e4c86b8575d768e6ccb0dbb80d))
 * **count:** persist drafts and resume saved counts ([d7fe0ed](https://github.com/ernesg93/CYNDY-app/commit/d7fe0edf03c17060e9a948573d5907fca683f194))
 
 

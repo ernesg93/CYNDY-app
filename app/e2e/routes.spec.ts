@@ -284,17 +284,24 @@ test("quantity editing rejects invalid typing and paste while allowing grouped p
   await expect(input).toHaveAttribute("inputmode", "numeric");
 });
 
-test("five digit denominations and large totals fit on mobile", async ({ page }) => {
+for (const additionalCurrency of [false, true]) test(`five digit denominations and large totals fit on mobile (${additionalCurrency ? "two currencies" : "one currency"})`, async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/onboarding");
   await page.getByLabel("Currency name").fill("Peso");
   await page.getByLabel("Symbol").fill("$");
   await page.getByLabel("Currency code").fill("CUP");
   await page.getByLabel("Denominations (semicolon separated)").fill("20,000; 1");
+  if (additionalCurrency) {
+    await page.getByRole("button", { name: "Add another currency" }).click();
+    await page.getByLabel("Currency name").nth(1).fill("Dollar");
+    await page.getByLabel("Symbol").nth(1).fill("$");
+    await page.getByLabel("Currency code").nth(1).fill("USD");
+    await page.getByLabel("Denominations (semicolon separated)").nth(1).fill("10; 1");
+  }
   await page.getByRole("button", { name: "Save configuration" }).click();
   await page.goto("/count/new");
   await page.getByLabel("$20,000 quantity").fill("99999999");
-  const geometry = await page.locator(".currency-fieldset").evaluate((fieldset) => {
+  const geometry = await page.getByRole("group", { name: "Peso (CUP)" }).evaluate((fieldset) => {
     const label = fieldset.querySelector<HTMLElement>(".denomination-value")!;
     const total = fieldset.querySelector<HTMLElement>(".currency-total")!;
     return { labelFits: label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight,

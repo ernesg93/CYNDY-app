@@ -6,14 +6,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class ReleaseConfigTests(unittest.TestCase):
-    def test_initial_release_and_pre_major_policy(self):
+    def test_release_manifest_and_pre_major_policy(self):
         config = json.loads((ROOT / 'release-please-config.json').read_text())
         manifest = json.loads((ROOT / '.release-please-manifest.json').read_text())
-        self.assertEqual(manifest, {})
+        self.assertRegex(manifest['app'], r'^\d+\.\d+\.\d+$')
         self.assertEqual(config['bootstrap-sha'], '69391483460502edc68c2b5747b8f474ab65ac68')
         self.assertTrue(config['bump-minor-pre-major'])
         self.assertEqual(config['packages']['app']['release-type'], 'node')
-        self.assertEqual(config['packages']['app']['release-as'], '0.1.0')
+        self.assertNotIn('release-as', config['packages']['app'])
 
     def test_workflow_requires_explicit_enable_and_app_credentials(self):
         workflow = (ROOT / '.github/workflows/release-please.yml').read_text()

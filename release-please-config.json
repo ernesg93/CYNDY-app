@@ -5,8 +5,7 @@
   "include-component-in-tag": false,
   "packages": {
     "app": {
-      "release-type": "node",
-      "release-as": "0.1.0"
+      "release-type": "node"
     }
   }
 }

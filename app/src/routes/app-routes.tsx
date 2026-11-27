@@ -84,6 +84,7 @@ const spanish: Readonly<Record<string, string>> = {
   "Counts saved on this device will appear here. Start a count when you are ready.": "Los conteos guardados en este dispositivo aparecerán aquí. Inicia un conteo cuando estés listo.",
   "Loading history…": "Cargando historial…",
   "Count details": "Detalles del conteo",
+  "All quantities are zero.": "Todas las cantidades son cero.",
   "Saved count": "Folio guardado",
   "Loading count…": "Cargando conteo…",
   "Count deleted": "Conteo eliminado",
@@ -798,10 +799,13 @@ function CountDetailPage({ countId, repository, destination, prepareResume, resu
     role="status" tabIndex={-1}>{t("Count deleted.")}</p>
     <a href="/history">{t("Return to history")}</a></Page>;
   if (record === null) return <Page title="Count not found"><a href="/history">{t("Return to history")}</a></Page>;
+  const visibleSnapshots = record.snapshots.map((snapshot) => ({
+    ...snapshot, entries: snapshot.entries.filter((entry) => entry.quantity !== 0),
+  })).filter((snapshot) => snapshot.entries.length > 0);
   return <Page title="Count details" className="detail-page">
     <h2>{record.title || t("New count")}</h2>
     <CountTime record={record} />
-    <div className="detail-sheet">{record.snapshots.map((snapshot) => <section key={snapshot.currencyId}>
+    <div className="detail-sheet">{visibleSnapshots.length === 0 ? <p>{t("All quantities are zero.")}</p> : visibleSnapshots.map((snapshot) => <section key={snapshot.currencyId}>
       <h2>{snapshot.name} ({snapshot.code})</h2>
       <table className="detail-table" aria-label={`${snapshot.name} (${snapshot.code})`}>
         <thead><tr><th scope="col">{t("Denomination")}</th><th scope="col">{t("Quantity")}</th><th scope="col">{t("Subtotal")}</th></tr></thead>

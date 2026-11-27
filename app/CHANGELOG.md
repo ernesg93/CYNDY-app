@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/ernesg93/CYNDY-app/compare/v0.1.0...v0.2.0) (2026-11-27)
+
+
+### Features
+
+* **history:** simplify saved count details ([8a08923](https://github.com/ernesg93/CYNDY-app/commit/8a089232c52dc2c9a953a78fdd1c5368ffd3e6f5))
+* **history:** simplify saved count details ([9271f3c](https://github.com/ernesg93/CYNDY-app/commit/9271f3c759ce4df2a4df512d8ae3ef41988ea99c))
+
 ## 0.1.0 (2026-11-24)
 
 

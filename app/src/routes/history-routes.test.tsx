@@ -51,6 +51,45 @@ function expectNeutralLanguage() {
 }
 
 describe("stored count routes", () => {
+  it("filters zero rows and currencies for details and printing while preserving resume data", async () => {
+    const repository = new IndexedDbRepository({ indexedDB: new IDBFactory(), databaseName: crypto.randomUUID() });
+    await repository.saveCurrencyConfigurations([dollar, euro]);
+    const original = await repository.saveCount({ snapshots: calculateCountSnapshots([dollar, euro], { usd: { "1": 3, "5": 0 }, eur: { "2": 0 } }) });
+    const deliver = vi.fn();
+    window.history.replaceState({}, "", `/history/${original.id}`);
+    render(<ApplicationRoutes repository={repository} receiptDestination={{ deliver }} />);
+    const table = await screen.findByRole("table", { name: "US dollar (USD)" });
+    expect(within(table).getAllByRole("row")).toHaveLength(2);
+    expect(within(table).getByText("$1")).toBeTruthy();
+    expect(within(table).queryByText("$5")).toBeNull();
+    expect(screen.queryByRole("table", { name: "Euro (EUR)" })).toBeNull();
+    expect(screen.getByText("Total: $3 USD")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Print or save" }));
+    expect(deliver).toHaveBeenCalledWith(original);
+    expect(await repository.getCount(original.id)).toEqual(original);
+    fireEvent.click(screen.getByRole("button", { name: "Resume as new count" }));
+    expect(await screen.findByLabelText("$1 quantity")).toHaveProperty("value", "3");
+    expect(screen.getByLabelText("$5 quantity")).toHaveProperty("value", "0");
+    expect(screen.getByLabelText("€2 quantity")).toHaveProperty("value", "0");
+    expect(await repository.getCount(original.id)).toEqual(original);
+    repository.close();
+  });
+
+  it("shows a localized message for an all-zero saved count", async () => {
+    const repository = new IndexedDbRepository({ indexedDB: new IDBFactory(), databaseName: crypto.randomUUID() });
+    await repository.saveCurrencyConfigurations([dollar, euro]);
+    const original = await repository.saveCount({ snapshots: calculateCountSnapshots([dollar, euro], {}) });
+    window.history.replaceState({}, "", `/history/${original.id}`);
+    render(<ApplicationRoutes repository={repository} />);
+    expect(await screen.findByText("All quantities are zero.")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Change language" }));
+    expect(screen.getByText("Todas las cantidades son cero.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar idioma" }));
+    expect(await repository.getCount(original.id)).toEqual(original);
+    repository.close();
+  });
+
   it("resumes a saved count as a historical draft", async () => {
     const repository = await historyRepository();
     const original = await repository.getCount("count-1");

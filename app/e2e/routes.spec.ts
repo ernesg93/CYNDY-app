@@ -79,6 +79,7 @@ for (const [locale, heading, action, navigation, history] of [
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     await expect(page.getByText("Historical note Second line")).toHaveCount(0);
     await expect(page.getByRole("table", { name: "US dollar (USD)" })).toBeVisible();
+    await expect(page.getByRole("table", { name: "US dollar (USD)" }).getByRole("row")).toHaveCount(2);
     await expect(page.getByRole("table", { name: "Euro (EUR)" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Return to history|Volver al historial/ })).toHaveCount(0);
     expect(await page.evaluate(() => (window as unknown as { printCalls: number }).printCalls)).toBe(0);
@@ -87,6 +88,7 @@ for (const [locale, heading, action, navigation, history] of [
     await page.emulateMedia({ media: "print" });
     await expect(page.getByText("Historical note Second line")).toHaveCount(0);
     await expect(page.getByRole("table", { name: "US dollar (USD)" })).toBeVisible();
+    await expect(page.getByRole("table", { name: "US dollar (USD)" }).getByRole("row")).toHaveCount(2);
     await expect(page.getByRole("button", { name: action })).toBeHidden();
     await expect(page.locator(".bottom-nav")).toBeHidden();
     expect(await page.locator(".detail-table").first().evaluate((node) => getComputedStyle(node).color)).toBe("rgb(0, 0, 0)");

@@ -5,6 +5,7 @@ test.use({ viewport: { width: 390, height: 844 }, locale: "en-US" });
 test("navigation and action pairs remain visible and symmetric on mobile", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "Start a count" }).click();
+  await page.getByRole("group", { name: "Dolar US (USD)" }).getByLabel("$100 quantity").fill("1");
   await page.getByRole("button", { name: "Save count" }).click();
   await expect(page.getByText("Count saved.")).toBeVisible();
   for (const [link, selector] of [["Settings", ".settings-actions"], ["Count", ".count-page .actions"], ["History", ""]] as const) {

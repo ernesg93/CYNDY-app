@@ -15,6 +15,20 @@ class ReleaseConfigTests(unittest.TestCase):
         self.assertEqual(config['packages']['app']['release-type'], 'node')
         self.assertNotIn('release-as', config['packages']['app'])
 
+    def test_release_is_confined_to_preparation_branch(self):
+        workflow = (ROOT / '.github/workflows/release-please.yml').read_text()
+        self.assertIn('branches: [release-preparation]', workflow)
+        self.assertNotIn('branches: [main]', workflow)
+        self.assertIn("github.ref == 'refs/heads/release-preparation'", workflow)
+        self.assertIn('target-branch: release-preparation', workflow)
+
+    def test_ci_and_codeql_keep_main_and_cover_preparation_prs(self):
+        for name in ('ci.yml', 'codeql.yml'):
+            with self.subTest(workflow=name):
+                workflow = (ROOT / '.github/workflows' / name).read_text()
+                self.assertIn('push:\n    branches: [main]', workflow)
+                self.assertIn('pull_request:\n    branches: [main, release-preparation]', workflow)
+
     def test_workflow_requires_explicit_enable_and_app_credentials(self):
         workflow = (ROOT / '.github/workflows/release-please.yml').read_text()
         self.assertIn("vars.RELEASE_PLEASE_ENABLED == 'true'", workflow)

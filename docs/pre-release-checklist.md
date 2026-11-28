@@ -25,6 +25,13 @@ Complete these user-owned settings before the first public release. The reposito
 
 Validated on 2026-10-15: `https://cyndy-app.pages.dev` deploys from GitHub `main` with root `app`, build command `npm run build`, and output `dist`. The Pages project has no environment variables, Functions, Workers, bindings, deployment tokens, or vendor storage. Direct HTTPS requests to `/history` and an unknown client route returned `200` and rendered the expected SPA views.
 
+## Prepared-release migration gate
+
+- [ ] Obtain separate authorization before changing automation or PR #83; the local configuration does not disable the current remote workflow.
+- [ ] With automation safely paused by an authorized owner, reconcile PR #83, branch history, manifest, existing tags and the next proposed version before creating or enabling `release-preparation`.
+- [ ] Protect the preparation branch and verify CI and CodeQL on its PRs. Confirm `main` remains the Cloudflare production branch.
+- [ ] Authorize publication separately from promotion: review the preparation PR and its tag, then review the exact prepared tree in a PR to `main`. See [migration and promotion steps](release-operation.md#prepared-release-transition-not-yet-activated).
+
 ## Release evidence
 
 - [x] Record the required status-check names: `Unit, build and browser tests` and `CodeQL` (confirmed 2026-11-18).

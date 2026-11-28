@@ -448,5 +448,6 @@ button, .button { border:1px solid var(--red); border-radius:0; background:var(-
 @media (max-width: 24rem) {
   .app-header .brand { gap: 2px; }
   :root[data-theme] .app-header .brand { letter-spacing: 0; }
+  .app-header .brand span { width: 16px; height: 16px; font-size: 0.75em; }
   .app-header .brand small { font-size: 0.75em; }
 }

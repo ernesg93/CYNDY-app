@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { version } from "../../package.json";
 import { calculateCountSnapshots, type CountQuantities } from "../domain/count";
 import { formatNumber } from "../domain/format-number";
 import type { CurrencyConfiguration, ValidationIssue } from "../domain/validation";
@@ -1355,7 +1356,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
     <a className="skip-link" href="#main-content" onClick={(event) => { event.preventDefault(); document.getElementById("main-content")?.focus(); }}>{es ? "Saltar al contenido principal" : "Skip to main content"}</a>
     <header className="app-header" ref={headerRef}>
       <a className="header-control home-control" href="/" aria-label={words.home}><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11 12 3l9 8M5 10v10h14V10M9 20v-6h6v6" /></svg></a>
-      <a className="brand" href="/" aria-label={es ? "Inicio de CYNDY" : "CYNDY home"}><span aria-hidden="true">C</span> CYNDY</a>
+      <a className="brand" href="/" aria-label={es ? "Inicio de CYNDY" : "CYNDY home"} aria-describedby="app-version"><span aria-hidden="true">C</span> CYNDY <small id="app-version">v{version}</small></a>
       <div className="header-actions"><button type="button" className="header-control" aria-label={words.theme} onClick={() => setDark((value) => !value)}>{dark ? "☾" : "☀"}</button><button type="button" className="header-control" aria-label={words.language} onClick={() => { const next = es ? "en" : "es"; writeOptionalPreference("cyndy.locale", next); setLocale(next); }}>{es ? "ES" : "EN"}</button></div>
     </header>
     <main id="main-content" className="app-shell" tabIndex={-1}>{children}</main>

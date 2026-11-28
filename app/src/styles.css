@@ -444,3 +444,9 @@ button, .button { border:1px solid var(--red); border-radius:0; background:var(-
 .detail-actions > :not(button) { grid-column:1 / -1; }
 @media print { .detail-actions { display:none; } }
 @media (max-width:24rem) { .currency-total, :root[data-theme="dark"] .currency-total { inset-block-start:calc(60px + var(--visual-offset, 0px)); } }
+
+@media (max-width: 24rem) {
+  .app-header .brand { gap: 2px; }
+  :root[data-theme] .app-header .brand { letter-spacing: 0; }
+  .app-header .brand small { font-size: 0.75em; }
+}

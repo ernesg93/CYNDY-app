@@ -33,3 +33,18 @@ for (const width of [320, 360]) {
     expect(await brand.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
   });
 }
+
+test("header controls do not overlap with wider version text at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto("/onboarding");
+  const header = page.locator(".app-header");
+  const brand = header.locator(".brand");
+  await expect(brand.locator("small")).toBeVisible();
+  await brand.locator("small").evaluate((element) => { element.style.letterSpacing = "0.6em"; });
+  const [home, label, actions] = await Promise.all([
+    header.locator(".home-control").boundingBox(), brand.boundingBox(), header.locator(".header-actions").boundingBox(),
+  ]);
+  expect(label!.x).toBeGreaterThanOrEqual(home!.x + home!.width);
+  expect(label!.x + label!.width).toBeLessThanOrEqual(actions!.x);
+  expect(await brand.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+});

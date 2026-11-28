@@ -39,3 +39,5 @@ Validated on 2026-10-15: `https://cyndy-app.pages.dev` deploys from GitHub `main
   - Automated Chromium evidence passed on 2026-10-15: the initial page became service-worker-controlled, a newly opened page loaded offline after the initial page closed, and a cold first visit failed safely without an in-app offline promise. The owner confirmed installation, offline reopening and saved-count access on Android on 2026-11-18.
 - [x] Document rollback to a prior static build; device-local records are outside deployment rollback. See [release operation](release-operation.md).
 - [ ] Verify rollback on Android and the actual release deployment using synthetic records. An isolated Chromium test passed upgrade, offline reopening, rollback, and re-upgrade with a legacy note and a new title on 2026-10-30. The user also confirmed upgrade and offline reopening with both records on Android in an isolated incognito session.
+
+<!-- Temporary branch-check probe: do not merge. -->
